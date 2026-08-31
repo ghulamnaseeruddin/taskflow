@@ -85,14 +85,13 @@
       </div>
 
       <div class="profile-wrapper">
-        <div class="user-pill" id="profileTrigger" role="button" tabindex="0" aria-expanded="false">
+        <button type="button" class="user-pill" id="profileTrigger" aria-expanded="false">
           <div class="avatar" id="avatar">U</div>
           <div class="user-meta">
             <div class="user-name" id="userName">User</div>
-            <div class="user-email" id="userEmail">you@example.com</div>
           </div>
           <span class="chevron" aria-hidden="true">▾</span>
-        </div>
+        </button>
 
         <div class="profile-menu hidden" id="profileMenu">
           <button type="button" class="menu-item" data-action="settings">Settings</button>
@@ -180,6 +179,44 @@
 
       <div class="board" id="board"></div>
     </main>
+  </div>
+
+  <div class="profile-overlay hidden" id="profileOverlay" aria-hidden="true">
+    <div class="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+      <div class="profile-panel-head">
+        <div>
+          <p class="profile-kicker">Profile</p>
+          <h2 id="profileTitle">My account</h2>
+        </div>
+        <button type="button" class="panel-close" id="closeProfilePanel" aria-label="Close profile">✕</button>
+      </div>
+
+      <form id="profileForm" class="profile-form">
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar" id="profileAvatar">U</div>
+        </div>
+
+        <div class="field">
+          <label for="profileNameInput">Display name</label>
+          <input id="profileNameInput" type="text" placeholder="Your name" />
+        </div>
+
+        <div class="field">
+          <label for="profileEmailInput">Email</label>
+          <input id="profileEmailInput" type="email" placeholder="you@example.com" />
+        </div>
+
+        <div class="field">
+          <label for="profilePasswordInput">Password</label>
+          <input id="profilePasswordInput" type="password" placeholder="Update password" />
+        </div>
+
+        <div class="profile-actions">
+          <button type="button" class="btn-ghost btn-ghost--light" id="cancelProfilePanel">Cancel</button>
+          <button type="submit" class="btn-primary btn-primary--small">Save changes</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <div id="modalRoot"></div>

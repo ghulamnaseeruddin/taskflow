@@ -206,12 +206,21 @@ function renderUserPanel() {
   if (!currentUser) return;
 
   const userName = document.getElementById('userName');
-  const userEmail = document.getElementById('userEmail');
   const avatar = document.getElementById('avatar');
+  const profileAvatar = document.getElementById('profileAvatar');
+  const profileNameInput = document.getElementById('profileNameInput');
+  const profileEmailInput = document.getElementById('profileEmailInput');
+  const profilePasswordInput = document.getElementById('profilePasswordInput');
 
-  if (userName) userName.textContent = currentUser.name || currentUser.email.split('@')[0];
-  if (userEmail) userEmail.textContent = currentUser.email;
-  if (avatar) avatar.textContent = getInitials(currentUser.name, currentUser.email);
+  const name = currentUser.name || currentUser.email.split('@')[0];
+  const initial = getInitials(currentUser.name, currentUser.email);
+
+  if (userName) userName.textContent = name;
+  if (avatar) avatar.textContent = initial;
+  if (profileAvatar) profileAvatar.textContent = initial;
+  if (profileNameInput) profileNameInput.value = name;
+  if (profileEmailInput) profileEmailInput.value = currentUser.email;
+  if (profilePasswordInput) profilePasswordInput.value = '';
 }
 
 function renderAuth() {
@@ -474,6 +483,10 @@ function setupDashboardHandlers() {
   const navItems = document.querySelectorAll('.nav-item');
   const profileTrigger = document.getElementById('profileTrigger');
   const profileMenu = document.getElementById('profileMenu');
+  const profileOverlay = document.getElementById('profileOverlay');
+  const closeProfilePanel = document.getElementById('closeProfilePanel');
+  const cancelProfilePanel = document.getElementById('cancelProfilePanel');
+  const profileForm = document.getElementById('profileForm');
   const downloadToggle = document.getElementById('downloadToggle');
   const downloadPanel = document.getElementById('downloadPanel');
   const downloadOptions = document.querySelectorAll('.download-option');
@@ -513,11 +526,66 @@ function setupDashboardHandlers() {
   document.querySelectorAll('.menu-item').forEach((item) => {
     item.addEventListener('click', () => {
       const action = item.dataset.action;
-      if (!action) return;
-      flash(`${action === 'account' ? 'Account settings' : action.charAt(0).toUpperCase() + action.slice(1)} opened`, 'success');
       profileMenu?.classList.add('hidden');
       profileTrigger?.setAttribute('aria-expanded', 'false');
+
+      if (action === 'account' || action === 'settings' || action === 'appearance' || action === 'notifications') {
+        profileOverlay?.classList.remove('hidden');
+        profileOverlay?.setAttribute('aria-hidden', 'false');
+        flash('Profile settings opened', 'success');
+      }
     });
+  });
+
+  const closeProfile = () => {
+    profileOverlay?.classList.add('hidden');
+    profileOverlay?.setAttribute('aria-hidden', 'true');
+  };
+
+  closeProfilePanel?.addEventListener('click', closeProfile);
+  cancelProfilePanel?.addEventListener('click', closeProfile);
+
+  profileOverlay?.addEventListener('click', (event) => {
+    if (event.target === profileOverlay) closeProfile();
+  });
+
+  profileForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const profileNameInput = document.getElementById('profileNameInput');
+    const profileEmailInput = document.getElementById('profileEmailInput');
+    const profilePasswordInput = document.getElementById('profilePasswordInput');
+
+    const updatedName = (profileNameInput?.value || '').trim();
+    const updatedEmail = (profileEmailInput?.value || '').trim();
+    const updatedPassword = (profilePasswordInput?.value || '').trim();
+
+    if (!updatedName || !updatedEmail) {
+      flash('Name and email are required', 'error');
+      return;
+    }
+
+    const users = getUsers();
+    const currentUserIndex = users.findIndex((user) => user.id === currentUser?.id);
+
+    if (currentUserIndex >= 0) {
+      users[currentUserIndex] = {
+        ...users[currentUserIndex],
+        name: updatedName,
+        email: updatedEmail,
+        ...(updatedPassword ? { password: updatedPassword } : {}),
+      };
+      saveUsers(users);
+    }
+
+    currentUser = {
+      ...currentUser,
+      name: updatedName,
+      email: updatedEmail,
+    };
+    setCurrentUser(currentUser);
+    renderUserPanel();
+    closeProfile();
+    flash('Profile updated successfully', 'success');
   });
 
   downloadToggle?.addEventListener('click', () => {

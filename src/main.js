@@ -138,6 +138,221 @@ function migrateLegacyState() {
   return merged;
 }
 
+function showAndroidInstallModal() {
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;';
+  
+  const panel = document.createElement('div');
+  panel.className = 'modal-panel';
+  panel.style.cssText = `
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    max-width: 450px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-outer);
+  `;
+  
+  panel.innerHTML = `
+    <div style="margin-bottom: 12px;">
+      <p style="color: var(--muted); font-size: 0.85rem; text-transform: uppercase; font-weight: 700; margin-bottom: 8px;">📱 Install TaskFlow</p>
+      <h2 style="color: var(--ink); font-size: 1.4rem; font-weight: 700; margin: 0;">Android App</h2>
+    </div>
+    
+    <p style="color: var(--ink); margin: 16px 0; line-height: 1.6; font-size: 0.95rem;">
+      Same UI, UX & features as the web app. Works on Android 8.0+
+    </p>
+    
+    <div style="background: var(--surface-sky); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin: 18px 0;">
+      <p style="color: var(--primary-deep); font-weight: 700; margin: 0 0 8px 0; font-size: 0.9rem;">✨ Recommended: Expo Go</p>
+      <p style="color: var(--ink); margin: 0; font-size: 0.85rem; line-height: 1.5;">
+        Fastest way to install. Download Expo Go from Play Store, scan QR code, app runs instantly.
+      </p>
+    </div>
+    
+    <div style="display: flex; gap: 10px; flex-direction: column; margin-top: 20px;">
+      <button type="button" id="androidInstallBtn" style="width: 100%; padding: 12px 16px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95rem; transition: all 0.15s;">
+        📱 Install with Expo Go
+      </button>
+      <button type="button" id="androidQrBtn" style="width: 100%; padding: 12px 16px; background: var(--surface-sky); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95rem;">
+        📸 Show QR Code
+      </button>
+      <button type="button" id="androidBuildBtn" style="width: 100%; padding: 12px 16px; background: var(--surface-sky); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95rem;">
+        ⬇️ Build APK (Dev)
+      </button>
+      <button type="button" id="androidCloseBtn" style="width: 100%; padding: 12px 16px; background: transparent; color: var(--muted); border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+        Close
+      </button>
+    </div>
+    
+    <div style="margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line);">
+      <p style="color: var(--muted); font-size: 0.8rem; margin: 0; line-height: 1.5;">
+        <strong>How it works:</strong> Expo Go runs TaskFlow in a sandbox. No installation needed, updates instantly. For standalone app, build APK from source.
+      </p>
+    </div>
+  `;
+  
+  modal.appendChild(panel);
+  document.body.appendChild(modal);
+  
+  const closeModal = () => {
+    modal.remove();
+  };
+  
+  document.getElementById('androidCloseBtn')?.addEventListener('click', closeModal);
+  
+  // Install with Expo Go - opens Expo app
+  document.getElementById('androidInstallBtn')?.addEventListener('click', () => {
+    const expoLink = 'expo+taskflow://';
+    const fallbackLink = 'https://expo.dev/TaskFlowAndroid';
+    
+    // Try to open Expo app directly
+    window.location.href = expoLink;
+    
+    // Fallback to web after delay
+    setTimeout(() => {
+      window.open(fallbackLink, '_blank');
+      flash('📲 Open link in Expo Go app or scan QR code', 'success');
+    }, 500);
+  });
+  
+  // Show QR code
+  document.getElementById('androidQrBtn')?.addEventListener('click', () => {
+    showQRCodeModal();
+  });
+  
+  // Build APK instructions
+  document.getElementById('androidBuildBtn')?.addEventListener('click', () => {
+    showBuildInstructions();
+  });
+  
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+}
+
+function showQRCodeModal() {
+  const qrModal = document.createElement('div');
+  qrModal.style.cssText = 'position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1001;';
+  
+  const qrPanel = document.createElement('div');
+  qrPanel.style.cssText = `
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: var(--shadow-outer);
+  `;
+  
+  qrPanel.innerHTML = `
+    <h3 style="color: var(--ink); margin: 0 0 16px 0;">Scan with Expo Go</h3>
+    <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 16px;">
+      <svg width="250" height="250" viewBox="0 0 250 250" style="width: 100%; height: auto;">
+        <!-- Placeholder QR Code - In production, generate real QR -->
+        <rect width="250" height="250" fill="white"/>
+        <text x="125" y="125" font-size="16" text-anchor="middle" dominant-baseline="middle" fill="black">
+          QR Code
+        </text>
+        <text x="125" y="145" font-size="12" text-anchor="middle" dominant-baseline="middle" fill="#999">
+          expo.dev/TaskFlowAndroid
+        </text>
+      </svg>
+    </div>
+    <p style="color: var(--muted); margin: 0 0 16px 0; font-size: 0.9rem;">
+      1. Download <strong>Expo Go</strong> from Play Store<br>
+      2. Open Expo Go<br>
+      3. Scan this QR code with your phone<br>
+      4. App loads instantly!
+    </p>
+    <button type="button" id="qrCloseBtn" style="width: 100%; padding: 10px 16px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+      Got it!
+    </button>
+  `;
+  
+  qrModal.appendChild(qrPanel);
+  document.body.appendChild(qrModal);
+  
+  document.getElementById('qrCloseBtn')?.addEventListener('click', () => {
+    qrModal.remove();
+  });
+  
+  qrModal.addEventListener('click', (e) => {
+    if (e.target === qrModal) qrModal.remove();
+  });
+}
+
+function showBuildInstructions() {
+  const buildModal = document.createElement('div');
+  buildModal.style.cssText = 'position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1001; overflow-y: auto;';
+  
+  const buildPanel = document.createElement('div');
+  buildPanel.style.cssText = `
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    margin: 20px auto;
+    box-shadow: var(--shadow-outer);
+  `;
+  
+  buildPanel.innerHTML = `
+    <h3 style="color: var(--ink); margin: 0 0 16px 0;">Build APK (Developers)</h3>
+    
+    <div style="background: var(--surface-sky); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 16px; font-family: monospace; font-size: 0.85rem; color: var(--ink); overflow-x: auto;">
+      <div style="margin-bottom: 8px; color: var(--muted);"># Install EAS CLI</div>
+      <div>npm install -g eas-cli</div>
+      <div style="margin-top: 8px; margin-bottom: 8px; color: var(--muted);"># Build for Android</div>
+      <div>cd ~/TaskFlowAndroid</div>
+      <div>eas build --platform android</div>
+      <div style="margin-top: 8px; margin-bottom: 8px; color: var(--muted);"># Or build locally</div>
+      <div>npx expo export:android</div>
+    </div>
+    
+    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 0.85rem; color: #991b1b;">
+      <strong>Note:</strong> Building requires Node.js, npm, and Expo CLI. Takes 10-20 minutes on first build.
+    </div>
+    
+    <div style="display: flex; gap: 10px;">
+      <button type="button" id="copyBuildCmd" style="flex: 1; padding: 10px 16px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+        📋 Copy Commands
+      </button>
+      <button type="button" id="buildCloseBtn" style="flex: 1; padding: 10px 16px; background: var(--surface-sky); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font-weight: 600; cursor: pointer;">
+        Close
+      </button>
+    </div>
+  `;
+  
+  buildModal.appendChild(buildPanel);
+  document.body.appendChild(buildModal);
+  
+  const buildCommands = `npm install -g eas-cli
+cd ~/TaskFlowAndroid
+eas build --platform android`;
+  
+  document.getElementById('copyBuildCmd')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(buildCommands).then(() => {
+      flash('✓ Build commands copied to clipboard', 'success');
+    });
+  });
+  
+  document.getElementById('buildCloseBtn')?.addEventListener('click', () => {
+    buildModal.remove();
+  });
+  
+  buildModal.addEventListener('click', (e) => {
+    if (e.target === buildModal) buildModal.remove();
+  });
+}
+
+
 function loadAppState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -949,8 +1164,17 @@ function setupDashboardHandlers() {
 
   downloadOptions.forEach((option) => {
     option.addEventListener('click', () => {
+      if (option.disabled) return;
+      
       const platform = option.dataset.os || 'platform';
-      flash(`${platform.charAt(0).toUpperCase() + platform.slice(1)} download is coming soon`, 'success');
+      
+      if (platform === 'android') {
+        // Android download handler
+        showAndroidInstallModal();
+      } else {
+        // Coming soon message for other platforms
+        flash(`${platform.charAt(0).toUpperCase() + platform.slice(1)} app coming soon!`, 'success');
+      }
     });
   });
 

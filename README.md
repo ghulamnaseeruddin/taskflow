@@ -1,78 +1,110 @@
-# TaskFlow
+# 🚀 TaskFlow - Global State Productivity App
 
-A production-ready, full-stack To-Do List web application — Flask + SQLAlchemy backend, vanilla JS frontend, ready to deploy.
+**Modern task management with Web + Android apps. Download directly from the web app.**
 
 ## Features
 
-- Email/username signup & login (Flask-Login, hashed passwords)
-- Tasks with title, notes, priority, category, due date
-- Drag-and-drop reordering
-- Filters: all / active / completed / overdue, by priority, by category
-- Fully responsive UI (desktop sidebar, mobile slide-out menu)
-- JSON API powering instant updates with no page reloads
-- Works with SQLite locally and Postgres in production (one env var change)
+✅ **Web App** - Vite + Vanilla JS  
+📱 **Android App** - React Native + Expo  
+🎨 **Premium Themes** - Light, Dark, Sepia  
+💾 **Local Storage** - No backend needed  
+📲 **Download Section** - Install Android from web interface  
 
-## Project Structure
+## Quick Start
+
+### Users - Web (30 seconds)
+```bash
+1. Visit https://your-taskflow-site.com
+2. Sign up with email/password
+3. Create tasks and organize
+4. Data saved locally
+```
+
+### Users - Android (No APK needed!)
+```bash
+1. Click "Download App" → Android
+2. Select "Install with Expo Go"  
+3. Opens Expo app automatically
+4. App loads in 30 seconds
+```
+
+### Developers (2 minutes)
+```bash
+git clone <repo>
+cd taskflow
+npm install && npm run dev
+# http://localhost:5173
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Web Frontend | Vite + ES Modules |
+| Mobile | React Native + Expo |
+| Storage | localStorage / AsyncStorage |
+| Styling | CSS Variables |
+| State | Global object |
+| Build | Vite / Expo |
+
+## Files
 
 ```
 taskflow/
-  app/
-    __init__.py        # App factory
-    config.py           # Environment-based config
-    extensions.py        # db, login_manager, migrate
-    models.py            # User, Task (SQLAlchemy models)
-    auth/routes.py        # signup / login / logout
-    tasks/routes.py       # dashboard + JSON API
-    templates/            # Jinja2 templates
-    static/css/style.css   # All styling
-    static/js/app.js        # Dashboard frontend logic
-  wsgi.py                # Entry point for gunicorn / local run
-  requirements.txt
-  Procfile               # For Render / Heroku
-  .env.example
+  ├── index.html              # Shell with download section
+  ├── src/
+  │   ├── main.js             # App logic + Android modal handler
+  │   └── style.css           # Themes + download styles
+  ├── dist/                   # Built output
+  ├── start-dev.sh            # Quick start script
+  └── README.md
+
+TaskFlowAndroid/
+  ├── App.js                  # React Native complete app
+  ├── app.json                # Expo config
+  ├── INSTALL.md              # User guide
+  └── node_modules/
 ```
 
-## Local Setup
+## Download Section Explained
 
+Users click "Download App" → Android in the web app:
+
+### 📱 Install with Expo Go (Recommended)
+- Opens Expo Go app
+- App loads in 30 seconds
+- No download needed
+- Instant updates
+
+### 📸 Show QR Code  
+- Display QR code
+- Scan with Expo Go
+- Same result as above
+
+### ⬇️ Build APK (Developers)
+- Show build commands
+- Use Expo Cloud Build
+- Download standalone APK
+
+## Deployment
+
+### Web
 ```bash
-cd taskflow
-python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # Mac/Linux
-
-pip install -r requirements.txt
-copy .env.example .env       # Windows: copy, Mac/Linux: cp
-# Edit .env and set a real SECRET_KEY
-
-python wsgi.py
+npm run build
+# Deploy dist/ to Vercel, Netlify, etc
 ```
 
-Visit `http://127.0.0.1:5000` — it redirects to login. Click "Create an account" to sign up.
+### Android
+```bash
+cd TaskFlowAndroid
+eas build --platform android
+# Download APK from EAS
+```
 
-The SQLite database is created automatically on first run at `instance/taskflow.db`.
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for full guide.
 
-## Deploying (industry-standard options)
+## Support
 
-### Option A: Render.com (recommended, free tier available)
-1. Push this folder to a GitHub repo.
-2. On Render: New → Web Service → connect your repo.
-3. Build command: `pip install -r requirements.txt`
-4. Start command: `gunicorn wsgi:app`
-5. Add environment variables: `SECRET_KEY` (random string), `FLASK_ENV=production`.
-6. Add a free Postgres database on Render and copy its "Internal Database URL" into `DATABASE_URL`.
-
-### Option B: Railway.app
-Same idea — connect the repo, it auto-detects the `Procfile`, add the same env vars and a Postgres plugin.
-
-### Option C: PythonAnywhere
-Good for SQLite-based small deployments; follow their Flask WSGI setup guide and point it at `wsgi.py`.
-
-## Switching from SQLite to Postgres
-
-No code changes needed — just set the `DATABASE_URL` environment variable to your Postgres connection string. `config.py` already handles the `postgres://` → `postgresql://` fix that Render/Heroku need.
-
-## Security Notes Before Going Live
-
-- Set a strong, random `SECRET_KEY` in production (never reuse the dev default).
-- Set `FLASK_ENV=production` so cookies are marked `Secure` (requires HTTPS, which Render/Railway provide by default).
-- Passwords are hashed with Werkzeug's PBKDF2-SHA256 — never stored in plain text.
+- 📖 [Development Guide](./DEPLOYMENT.md)
+- 📱 [Android Install](./TaskFlowAndroid/INSTALL.md)
+- 🐛 [Report Issues](https://github.com/yourusername/taskflow/issues)

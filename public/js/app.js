@@ -1,276 +1,509 @@
-// public/js/app.js
-// Client-side SQLite + UI glue for TaskFlow (uses sql.js)
-// Requires: <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+(function () {
+  const USERS_KEY = 'taskflow_users_v1';
+  const TASKS_KEY = 'taskflow_tasks_v1';
+  const CURRENT_USER_KEY = 'taskflow_current_user_v1';
 
-(async function () {
-  // Ensure sql.js is available
-  if (typeof initSqlJs !== 'function') {
-    console.error('sql.js (initSqlJs) not found — make sure sql-wasm.js is loaded first.');
-    return;
-  }
+  const authScreen = document.getElementById('authScreen');
+  const appShell = document.getElementById('appShell');
+  const flashWrap = document.getElementById('flashWrap');
+  const board = document.getElementById('board');
+  const progressFill = document.getElementById('progressFill');
+  const countAll = document.getElementById('countAll');
+  const countOpen = document.getElementById('countOpen');
+  const countDone = document.getElementById('countDone');
+  const modalRoot = document.getElementById('modalRoot');
 
-  const SQL = await initSqlJs({
-    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
-  });
+  let currentFilter = 'all';
+  let tasks = loadTasks();
+  let currentUser = getCurrentUser();
+  let editingTaskId = null;
+  let isLoginMode = true;
 
-  // DB and state
-  let db = null;
-  const STORAGE_KEY = 'taskflow_db_v1';
-  const USER_KEY = 'taskflow_user_v1';
-
-  // Helpers: persist / load DB to/from localStorage (Base64)
-  function saveDB() {
-    try {
-      const data = db.export();
-      const str = btoa(String.fromCharCode(...data));
-      localStorage.setItem(STORAGE_KEY, str);
-    } catch (err) {
-      console.error('Failed to save DB', err);
-    }
-  }
-
-  function loadDB() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
-      db = new SQL.Database(bytes);
-    } else {
-      db = new SQL.Database();
-      createTables();
-      saveDB();
-    }
-  }
-
-  // Create required tables (users + tasks)
-  function createTables() {
-    const q = `
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      name TEXT
-    );
-    CREATE TABLE IF NOT EXISTS tasks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      description TEXT,
-      completed INTEGER DEFAULT 0,
-      priority TEXT DEFAULT 'low',
-      created_at TEXT DEFAULT (datetime('now')),
-      user_id INTEGER NOT NULL,
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    );
-    `;
-    db.run(q);
-  }
-
-  // Simple flash UI
   function flash(message, type = 'success') {
-    const wrap = document.getElementById('flashWrap');
-    if (!wrap) return;
+    if (!flashWrap) return;
     const el = document.createElement('div');
-    el.className = 'flash ' + (type === 'error' ? 'flash-error' : 'flash-success');
+    el.className = `flash flash-${type}`;
     el.textContent = message;
-    wrap.appendChild(el);
-    setTimeout(() => el.remove(), 3500);
+    flashWrap.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
   }
 
-  // Authentication (very simple; passwords stored client-side for demo)
-  function registerUser(email, password, name = '') {
+  function saveTasks() {
+    localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+  }
+
+  function loadTasks() {
     try {
-      const stmt = db.prepare('INSERT INTO users (email, password, name) VALUES (?, ?, ?)');
-      stmt.run([email, password, name]);
-      stmt.free();
-      saveDB();
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
+      const raw = localStorage.getItem(TASKS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error('Failed to load tasks:', error);
+      return [];
     }
   }
 
-  function loginUser(email, password) {
+  function getCurrentUser() {
     try {
-      const stmt = db.prepare('SELECT id, name, email FROM users WHERE email = ? AND password = ? LIMIT 1');
-      stmt.bind([email, password]);
-      if (stmt.step()) {
-        const row = stmt.getAsObject();
-        stmt.free();
-        localStorage.setItem(USER_KEY, String(row.id));
-        flash('Signed in');
-        return row;
-      } else {
-        stmt.free();
-        return null;
-      }
-    } catch (err) {
-      console.error(err);
+      const raw = localStorage.getItem(CURRENT_USER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      console.error('Failed to load current user:', error);
       return null;
     }
   }
 
-  function getCurrentUserId() {
-    const v = localStorage.getItem(USER_KEY);
-    return v ? Number(v) : null;
+  function setCurrentUser(user) {
+    currentUser = user;
+    if (!user) {
+      localStorage.removeItem(CURRENT_USER_KEY);
+      return;
+    }
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
   }
 
-  function logout() {
-    localStorage.removeItem(USER_KEY);
-    renderAuthScreen();
+  function getUsers() {
+    try {
+      const raw = localStorage.getItem(USERS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error('Failed to parse users:', error);
+      return [];
+    }
   }
 
-  // Task operations
-  function createTask({ title, description = '', priority = 'low' }) {
-    const uid = getCurrentUserId();
-    if (!uid) throw new Error('Not signed in');
-    const stmt = db.prepare('INSERT INTO tasks (title, description, priority, user_id) VALUES (?, ?, ?, ?)');
-    stmt.run([title, description, priority, uid]);
-    stmt.free();
-    saveDB();
+  function saveUsers(users) {
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
   }
 
-  function updateTaskStatus(id, completed) {
-    const uid = getCurrentUserId();
-    if (!uid) throw new Error('Not signed in');
-    const stmt = db.prepare('UPDATE tasks SET completed = ? WHERE id = ? AND user_id = ?');
-    stmt.run([completed ? 1 : 0, id, uid]);
-    stmt.free();
-    saveDB();
+  function getInitials(name, email) {
+    const source = (name && name.trim()) || (email && email.trim()) || 'U';
+    return source.charAt(0).toUpperCase();
   }
 
-  function deleteTask(id) {
-    const uid = getCurrentUserId();
-    const stmt = db.prepare('DELETE FROM tasks WHERE id = ? AND user_id = ?');
-    stmt.run([id, uid]);
-    stmt.free();
-    saveDB();
+  function renderCounts() {
+    const total = tasks.length;
+    const open = tasks.filter((task) => !task.completed).length;
+    const done = tasks.filter((task) => task.completed).length;
+
+    if (countAll) countAll.textContent = String(total);
+    if (countOpen) countOpen.textContent = String(open);
+    if (countDone) countDone.textContent = String(done);
+
+    const percent = total ? Math.round((done / total) * 100) : 0;
+    if (progressFill) progressFill.style.width = `${percent}%`;
   }
 
-  function editTask(id, { title, description, priority }) {
-    const uid = getCurrentUserId();
-    const stmt = db.prepare('UPDATE tasks SET title = ?, description = ?, priority = ? WHERE id = ? AND user_id = ?');
-    stmt.run([title, description, priority, id, uid]);
-    stmt.free();
-    saveDB();
+  function filterTasks() {
+    if (currentFilter === 'all') return tasks;
+    if (currentFilter === 'open') return tasks.filter((task) => !task.completed);
+    if (currentFilter === 'done') return tasks.filter((task) => task.completed);
+    return tasks;
   }
 
-  function fetchTasks(filter = 'all') {
-    const uid = getCurrentUserId();
-    if (!uid) return [];
-    let q = 'SELECT * FROM tasks WHERE user_id = ?';
-    if (filter === 'open') q += ' AND completed = 0';
-    if (filter === 'done') q += ' AND completed = 1';
-    q += ' ORDER BY created_at DESC';
-    const stmt = db.prepare(q);
-    stmt.bind([uid]);
-    const out = [];
-    while (stmt.step()) out.push(stmt.getAsObject());
-    stmt.free();
-    return out;
+  function renderBoard() {
+    if (!board) return;
+    const visibleTasks = filterTasks();
+    board.innerHTML = '';
+
+    if (!visibleTasks.length) {
+      board.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">✓</div>
+          <h3>No tasks yet</h3>
+          <p>Create your first task and stay on top of your day.</p>
+        </div>
+      `;
+      return;
+    }
+
+    visibleTasks
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .forEach((task) => {
+        const card = document.createElement('div');
+        card.className = `task-card${task.completed ? ' completed' : ''}`;
+        card.dataset.id = String(task.id);
+
+        const checkBtn = document.createElement('button');
+        checkBtn.type = 'button';
+        checkBtn.className = 'check-btn';
+        checkBtn.textContent = task.completed ? '✓' : '';
+        checkBtn.setAttribute('aria-label', task.completed ? 'Mark task as incomplete' : 'Mark task as complete');
+        checkBtn.addEventListener('click', () => toggleTask(task.id));
+
+        const body = document.createElement('div');
+        body.className = 'task-body';
+
+        const titleRow = document.createElement('div');
+        titleRow.className = 'task-title-row';
+
+        const title = document.createElement('div');
+        title.className = 'task-title';
+        title.textContent = task.title;
+
+        const priorityBadge = document.createElement('span');
+        priorityBadge.className = `badge badge-${task.priority || 'low'}`;
+        priorityBadge.textContent = task.priority || 'low';
+
+        const categoryBadge = document.createElement('span');
+        categoryBadge.className = 'badge badge-category';
+        categoryBadge.textContent = task.category || 'General';
+
+        titleRow.appendChild(title);
+        titleRow.appendChild(priorityBadge);
+        titleRow.appendChild(categoryBadge);
+
+        const notes = document.createElement('p');
+        notes.className = 'task-notes';
+        notes.textContent = task.description || 'No description';
+
+        const meta = document.createElement('div');
+        meta.className = 'task-meta';
+
+        if (task.dueDate) {
+          const dueDate = document.createElement('span');
+          dueDate.textContent = `Due: ${new Date(task.dueDate).toLocaleDateString()}`;
+          meta.appendChild(dueDate);
+        }
+
+        const createdDate = document.createElement('span');
+        createdDate.textContent = `Created: ${new Date(task.createdAt).toLocaleDateString()}`;
+        meta.appendChild(createdDate);
+
+        body.appendChild(titleRow);
+        body.appendChild(notes);
+        body.appendChild(meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'task-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'icon-btn';
+        editBtn.textContent = '✎';
+        editBtn.setAttribute('aria-label', 'Edit task');
+        editBtn.addEventListener('click', () => openTaskModal(task.id));
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'icon-btn delete';
+        deleteBtn.textContent = '✕';
+        deleteBtn.setAttribute('aria-label', 'Delete task');
+        deleteBtn.addEventListener('click', () => deleteTask(task.id));
+
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+
+        card.appendChild(checkBtn);
+        card.appendChild(body);
+        card.appendChild(actions);
+        board.appendChild(card);
+      });
   }
 
-  function counts() {
-    const uid = getCurrentUserId();
-    if (!uid) return { all: 0, open: 0, done: 0 };
-    const all = db.exec('SELECT COUNT(*) AS c FROM tasks WHERE user_id = ' + uid)[0]?.values?.[0]?.[0] ?? 0;
-    const open = db.exec('SELECT COUNT(*) AS c FROM tasks WHERE user_id = ' + uid + ' AND completed = 0')[0]?.values?.[0]?.[0] ?? 0;
-    const done = db.exec('SELECT COUNT(*) AS c FROM tasks WHERE user_id = ' + uid + ' AND completed = 1')[0]?.values?.[0]?.[0] ?? 0;
-    return { all: Number(all), open: Number(open), done: Number(done) };
+  function renderUserPanel() {
+    if (!currentUser) return;
+
+    const userName = document.getElementById('userName');
+    const userEmail = document.getElementById('userEmail');
+    const avatar = document.getElementById('avatar');
+
+    if (userName) userName.textContent = currentUser.name || currentUser.email.split('@')[0];
+    if (userEmail) userEmail.textContent = currentUser.email;
+    if (avatar) avatar.textContent = getInitials(currentUser.name, currentUser.email);
   }
 
-  // UI rendering
-  function renderAuthScreen() {
-    const uid = getCurrentUserId();
-    const authScreen = document.getElementById('authScreen');
-    const appShell = document.getElementById('appShell');
-    if (uid) {
-      // Signed in -> show app
+  function renderAuth() {
+    if (!authScreen || !appShell) return;
+
+    if (currentUser) {
       authScreen.style.display = 'none';
-      appShell.style.display = '';
-      renderApp();
+      appShell.style.display = 'flex';
+      renderUserPanel();
+      renderCounts();
+      renderBoard();
     } else {
-      authScreen.style.display = '';
+      authScreen.style.display = 'grid';
       appShell.style.display = 'none';
     }
   }
 
-  function renderApp() {
-    // Update user details in sidebar
-    const uid = getCurrentUserId();
-    if (!uid) return;
-    const stmt = db.prepare('SELECT id, email, name FROM users WHERE id = ? LIMIT 1');
-    stmt.bind([uid]);
-    let row = null;
-    if (stmt.step()) row = stmt.getAsObject();
-    stmt.free();
-    document.getElementById('userEmail').textContent = row?.email ?? '';
-    document.getElementById('userName').textContent = row?.name || (row?.email || '').split('@')[0];
-    document.getElementById('avatar').textContent = (row?.name?.[0] || row?.email?.[0] || 'U').toUpperCase();
+  function createTask(task) {
+    const newTask = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      title: task.title,
+      description: task.description || '',
+      category: task.category || 'General',
+      priority: task.priority || 'low',
+      dueDate: task.dueDate || '',
+      completed: Boolean(task.completed),
+      createdAt: new Date().toISOString()
+    };
 
+    tasks.unshift(newTask);
+    saveTasks();
     renderCounts();
-    renderBoard('all');
+    renderBoard();
   }
 
-  function renderCounts() {
-    const c = counts();
-    document.getElementById('countAll').textContent = c.all;
-    document.getElementById('countOpen').textContent = c.open;
-    document.getElementById('countDone').textContent = c.done;
-    const total = c.all || 1;
-    const percent = Math.round(((c.done || 0) / total) * 100);
-    document.getElementById('progressFill').style.width = percent + '%';
+  function toggleTask(taskId) {
+    tasks = tasks.map((task) => {
+      if (task.id === taskId) {
+        return { ...task, completed: !task.completed };
+      }
+      return task;
+    });
+
+    saveTasks();
+    renderCounts();
+    renderBoard();
   }
 
-  function renderBoard(filter = 'all') {
-    const tasks = fetchTasks(filter);
-    const board = document.getElementById('board');
-    board.innerHTML = '';
-    if (!tasks.length) {
-      board.innerHTML = `<div class="empty-state"><div class="empty-icon">✓</div><h3>No tasks yet</h3><p class="text-muted">Create your first task to get started.</p></div>`;
-      return;
-    }
-    for (const t of tasks) {
-      const card = document.createElement('div');
-      card.className = 'task-card' + (t.completed ? ' completed' : '');
-      card.dataset.id = t.id;
+  function deleteTask(taskId) {
+    const confirmed = window.confirm('Delete this task permanently?');
+    if (!confirmed) return;
 
-      const check = document.createElement('button');
-      check.className = 'check-btn';
-      check.innerHTML = t.completed ? '✔' : '';
-      check.onclick = () => {
-        updateTaskStatus(t.id, !t.completed);
-        renderBoard(filter);
-        renderCounts();
+    tasks = tasks.filter((task) => task.id !== taskId);
+    saveTasks();
+    renderCounts();
+    renderBoard();
+    flash('Task deleted', 'success');
+  }
+
+  function updateTask(taskId, updates) {
+    tasks = tasks.map((task) => {
+      if (task.id === taskId) {
+        return { ...task, ...updates };
+      }
+      return task;
+    });
+
+    saveTasks();
+    renderCounts();
+    renderBoard();
+  }
+
+  function closeTaskModal() {
+    if (modalRoot) modalRoot.innerHTML = '';
+    editingTaskId = null;
+  }
+
+  function openTaskModal(taskId = null) {
+    if (!modalRoot) return;
+
+    const task = tasks.find((item) => item.id === taskId);
+    const isEdit = Boolean(task);
+    editingTaskId = taskId;
+
+    modalRoot.innerHTML = `
+      <div class="modal-backdrop" id="modalBackdrop">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+          <div class="modal-head">
+            <h2 id="modalTitle">${isEdit ? 'Edit task' : 'New task'}</h2>
+            <button type="button" class="modal-close" id="modalClose" aria-label="Close">✕</button>
+          </div>
+
+          <form id="taskForm" novalidate>
+            <label for="taskTitle">Title</label>
+            <input id="taskTitle" name="title" type="text" value="${(task && task.title) || ''}" required />
+
+            <label for="taskDescription">Description</label>
+            <textarea id="taskDescription" name="description" rows="4">${(task && task.description) || ''}</textarea>
+
+            <div class="form-row">
+              <div>
+                <label for="taskPriority">Priority</label>
+                <select id="taskPriority" name="priority">
+                  <option value="low" ${task && task.priority === 'low' ? 'selected' : ''}>Low</option>
+                  <option value="medium" ${task && task.priority === 'medium' ? 'selected' : ''}>Medium</option>
+                  <option value="high" ${task && task.priority === 'high' ? 'selected' : ''}>High</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="taskCategory">Category</label>
+                <input id="taskCategory" name="category" type="text" value="${(task && task.category) || 'General'}" />
+              </div>
+            </div>
+
+            <label for="taskDueDate">Due date</label>
+            <input id="taskDueDate" name="dueDate" type="date" value="${(task && task.dueDate) || ''}" />
+
+            <div class="modal-actions">
+              <button type="button" class="btn-ghost btn-ghost--light" id="cancelModal">Cancel</button>
+              <button type="submit" class="btn-primary btn-primary--small">${isEdit ? 'Save changes' : 'Create task'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const backdrop = document.getElementById('modalBackdrop');
+    const closeBtn = document.getElementById('modalClose');
+    const cancelBtn = document.getElementById('cancelModal');
+    const form = document.getElementById('taskForm');
+
+    backdrop?.addEventListener('click', (event) => {
+      if (event.target === backdrop) closeTaskModal();
+    });
+
+    closeBtn?.addEventListener('click', closeTaskModal);
+    cancelBtn?.addEventListener('click', closeTaskModal);
+
+    form?.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      const formData = new FormData(form);
+      const payload = {
+        title: String(formData.get('title') || '').trim(),
+        description: String(formData.get('description') || '').trim(),
+        priority: String(formData.get('priority') || 'low'),
+        category: String(formData.get('category') || 'General').trim() || 'General',
+        dueDate: String(formData.get('dueDate') || '').trim()
       };
 
-      const body = document.createElement('div');
-      body.className = 'task-body';
+      if (!payload.title) {
+        flash('Task title is required', 'error');
+        return;
+      }
 
-      const titleRow = document.createElement('div');
-      titleRow.className = 'task-title-row';
+      if (editingTaskId) {
+        updateTask(editingTaskId, payload);
+        flash('Task updated', 'success');
+      } else {
+        createTask(payload);
+        flash('Task created', 'success');
+      }
 
-      const title = document.createElement('div');
-      title.className = 'task-title';
-      title.textContent = t.title;
+      closeTaskModal();
+    });
+  }
 
-      const badge = document.createElement('div');
-      badge.className = 'badge ' + (t.priority === 'high' ? 'badge-high' : t.priority === 'medium' ? 'badge-medium' : 'badge-low');
-      badge.style.marginLeft = '12px';
-      badge.textContent = t.priority;
+  function setAuthMode(loginMode) {
+    isLoginMode = loginMode;
 
-      titleRow.appendChild(title);
-      titleRow.appendChild(badge);
+    const nameField = document.getElementById('nameField');
+    const authTitle = document.getElementById('authTitle');
+    const authSub = document.getElementById('authSub');
+    const switchText = document.getElementById('switchText');
+    const switchLink = document.getElementById('switchLink');
+    const authSubmit = document.getElementById('authSubmit');
 
-      const notes = document.createElement('div');
-      notes.className = 'task-notes';
-      notes.textContent = t.description || '';
+    if (nameField) nameField.classList.toggle('hidden', loginMode);
+    if (authTitle) authTitle.textContent = loginMode ? 'Welcome back' : 'Create your account';
+    if (authSub) authSub.textContent = loginMode ? 'Sign in to continue to TaskFlow.' : 'Start organizing your tasks today.';
+    if (switchText) switchText.textContent = loginMode ? 'New here?' : 'Already have an account?';
+    if (switchLink) switchLink.textContent = loginMode ? 'Create an account' : 'Sign in';
+    if (authSubmit) authSubmit.textContent = loginMode ? 'Sign in' : 'Create account';
+  }
 
-      const meta = document.createElement('div');
-      meta.className = 'task-meta';
-      meta.textContent = new Date(t.created_at).toLocaleString();
+  function setupAuthHandlers() {
+    const authForm = document.getElementById('authForm');
+    const switchLink = document.getElementById('switchLink');
 
-      const actions = document.createElement('div');
-      actions.className = 'task-actions';
+    switchLink?.addEventListener('click', () => {
+      setAuthMode(!isLoginMode);
+    });
+
+    authForm?.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      const emailInput = document.getElementById('email');
+      const passwordInput = document.getElementById('password');
+      const nameInput = document.getElementById('name');
+
+      const email = (emailInput?.value || '').trim();
+      const password = (passwordInput?.value || '').trim();
+      const name = (nameInput?.value || '').trim();
+
+      if (!email || !password) {
+        flash('Email and password are required', 'error');
+        return;
+      }
+
+      const users = getUsers();
+
+      if (isLoginMode) {
+        const user = users.find((entry) => entry.email.toLowerCase() === email.toLowerCase() && entry.password === password);
+
+        if (!user) {
+          flash('Invalid email or password', 'error');
+          return;
+        }
+
+        currentUser = { id: user.id, email: user.email, name: user.name || user.email.split('@')[0] };
+        setCurrentUser(currentUser);
+        renderAuth();
+        flash('Signed in successfully', 'success');
+        return;
+      }
+
+      const alreadyExists = users.some((entry) => entry.email.toLowerCase() === email.toLowerCase());
+      if (alreadyExists) {
+        flash('An account with this email already exists', 'error');
+        return;
+      }
+
+      const newUser = {
+        id: Date.now(),
+        email,
+        password,
+        name: name || email.split('@')[0]
+      };
+
+      users.push(newUser);
+      saveUsers(users);
+
+      currentUser = { id: newUser.id, email: newUser.email, name: newUser.name };
+      setCurrentUser(currentUser);
+      renderAuth();
+      flash('Account created successfully', 'success');
+    });
+  }
+
+  function setupDashboardHandlers() {
+    const newTaskBtn = document.getElementById('newTaskBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const navItems = document.querySelectorAll('.nav-item');
+
+    newTaskBtn?.addEventListener('click', () => openTaskModal());
+
+    logoutBtn?.addEventListener('click', () => {
+      setCurrentUser(null);
+      currentUser = null;
+      renderAuth();
+      flash('Logged out successfully', 'success');
+    });
+
+    sidebarToggle?.addEventListener('click', () => {
+      sidebar?.classList.toggle('open');
+    });
+
+    navItems.forEach((item) => {
+      item.addEventListener('click', () => {
+        navItems.forEach((navItem) => navItem.classList.remove('active'));
+        item.classList.add('active');
+        currentFilter = item.dataset.filter || 'all';
+        renderBoard();
+      });
+    });
+  }
+
+  function initialize() {
+    currentUser = getCurrentUser();
+    setAuthMode(true);
+    setupAuthHandlers();
+    setupDashboardHandlers();
+    renderAuth();
+  }
+
+  initialize();
+})();
 
       const editBtn = document.createElement('button');
       editBtn.className = 'icon-btn';

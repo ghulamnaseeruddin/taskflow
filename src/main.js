@@ -398,11 +398,17 @@ function setAuthMode(loginMode) {
   if (authSubmit) authSubmit.textContent = loginMode ? 'Sign in' : 'Create account';
 }
 
+function handleGoogleAuth() {
+  flash('Google OAuth is ready to connect with Firebase or Supabase.', 'success');
+}
+
 function setupAuthHandlers() {
   const authForm = document.getElementById('authForm');
   const switchLink = document.getElementById('switchLink');
+  const googleAuthBtn = document.getElementById('googleAuthBtn');
 
   switchLink?.addEventListener('click', () => setAuthMode(!isLoginMode));
+  googleAuthBtn?.addEventListener('click', handleGoogleAuth);
 
   authForm?.addEventListener('submit', (event) => {
     event.preventDefault();

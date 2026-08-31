@@ -472,6 +472,11 @@ function setupDashboardHandlers() {
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
   const navItems = document.querySelectorAll('.nav-item');
+  const profileTrigger = document.getElementById('profileTrigger');
+  const profileMenu = document.getElementById('profileMenu');
+  const downloadToggle = document.getElementById('downloadToggle');
+  const downloadPanel = document.getElementById('downloadPanel');
+  const downloadOptions = document.querySelectorAll('.download-option');
 
   newTaskBtn?.addEventListener('click', () => openTaskModal());
 
@@ -480,6 +485,51 @@ function setupDashboardHandlers() {
     currentUser = null;
     renderAuth();
     flash('Logged out successfully', 'success');
+  });
+
+  profileTrigger?.addEventListener('click', () => {
+    const shouldOpen = profileMenu && profileMenu.classList.contains('hidden');
+    profileMenu?.classList.toggle('hidden', !shouldOpen);
+    profileTrigger.setAttribute('aria-expanded', String(shouldOpen));
+  });
+
+  profileTrigger?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      profileTrigger.click();
+    }
+  });
+
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    if (!profileTrigger || !profileMenu) return;
+    if (!profileTrigger.contains(target) && !profileMenu.contains(target)) {
+      profileMenu.classList.add('hidden');
+      profileTrigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  document.querySelectorAll('.menu-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const action = item.dataset.action;
+      if (!action) return;
+      flash(`${action === 'account' ? 'Account settings' : action.charAt(0).toUpperCase() + action.slice(1)} opened`, 'success');
+      profileMenu?.classList.add('hidden');
+      profileTrigger?.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  downloadToggle?.addEventListener('click', () => {
+    downloadPanel?.classList.toggle('hidden');
+    downloadToggle.classList.toggle('open');
+  });
+
+  downloadOptions.forEach((option) => {
+    option.addEventListener('click', () => {
+      const platform = option.dataset.os || 'platform';
+      flash(`${platform.charAt(0).toUpperCase() + platform.slice(1)} download is coming soon`, 'success');
+    });
   });
 
   sidebarToggle?.addEventListener('click', () => {

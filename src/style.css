@@ -450,6 +450,10 @@ img {
   color: var(--ink);
 }
 
+.profile-wrapper {
+  position: relative;
+}
+
 .user-pill {
   background: rgba(255, 255, 255, 0.38);
   border: 1px solid rgba(87, 82, 94, 0.06);
@@ -458,6 +462,13 @@ img {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.user-meta {
+  flex: 1;
+  min-width: 0;
 }
 
 .avatar {
@@ -484,6 +495,47 @@ img {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chevron {
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.profile-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(87, 82, 94, 0.08);
+  border-radius: 20px;
+  box-shadow: var(--shadow-outer), var(--shadow-inner-top), var(--shadow-inner-bottom);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 30;
+}
+
+.menu-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 14px;
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.menu-item.danger {
+  color: #8d4545;
 }
 
 .filter-nav {
@@ -540,10 +592,110 @@ img {
   background: rgba(42, 36, 48, 0.1);
 }
 
-.logout-link {
+.download-box {
   margin-top: auto;
-  padding-top: 14px;
   border-top: 1px solid rgba(87, 82, 94, 0.12);
+  padding-top: 18px;
+}
+
+.download-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.3);
+  color: var(--ink);
+  border-radius: 18px;
+  padding: 12px 14px;
+  font-weight: 800;
+  box-shadow: var(--shadow-outer), var(--shadow-inner-top), var(--shadow-inner-bottom);
+}
+
+.download-chevron {
+  transition: transform 0.2s ease;
+}
+
+.download-toggle.open .download-chevron {
+  transform: rotate(180deg);
+}
+
+.download-panel {
+  margin-top: 12px;
+  background: rgba(255, 255, 255, 0.24);
+  border: 1px solid rgba(87, 82, 94, 0.08);
+  border-radius: 20px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.download-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.download-header strong {
+  color: var(--primary-deep);
+  font-size: 0.68rem;
+}
+
+.download-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.download-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(87, 82, 94, 0.08);
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 18px;
+  padding: 12px 8px;
+  color: var(--ink);
+  min-height: 110px;
+}
+
+.download-option.recommended {
+  background: linear-gradient(135deg, rgba(255, 153, 118, 0.16), rgba(255, 255, 255, 0.32));
+}
+
+.download-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.52);
+  box-shadow: inset 2px 2px 6px rgba(255, 255, 255, 0.6), inset -2px -2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.download-logo svg {
+  width: 22px;
+  height: 22px;
+}
+
+.download-name {
+  font-weight: 800;
+  font-size: 0.82rem;
+}
+
+.download-option small {
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .btn-ghost {

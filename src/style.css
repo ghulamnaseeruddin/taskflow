@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=Raleway:wght@400;500;600;700;800&family=Lora:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Nunito:wght@400;500;600;700;800&family=Merriweather:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 :root {
   --bg: #f5f1ec;
   --panel: #f9f5f1;
@@ -102,8 +104,52 @@ body[data-theme='lilac'] {
   --shadow-inner-bottom: inset -4px -4px 8px rgba(70, 59, 104, 0.08);
 }
 
+body[data-font='inter'] {
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
 body[data-font='poppins'] {
   font-family: 'Poppins', 'Segoe UI', sans-serif;
+}
+
+body[data-font='roboto'] {
+  font-family: 'Roboto', 'Segoe UI', sans-serif;
+}
+
+body[data-font='raleway'] {
+  font-family: 'Raleway', 'Segoe UI', sans-serif;
+}
+
+body[data-font='lora'] {
+  font-family: 'Lora', Georgia, serif;
+}
+
+body[data-font='quicksand'] {
+  font-family: 'Quicksand', 'Segoe UI', sans-serif;
+}
+
+body[data-font='manrope'] {
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+}
+
+body[data-font='montserrat'] {
+  font-family: 'Montserrat', 'Segoe UI', sans-serif;
+}
+
+body[data-font='nunito'] {
+  font-family: 'Nunito', 'Segoe UI', sans-serif;
+}
+
+body[data-font='merriweather'] {
+  font-family: 'Merriweather', Georgia, serif;
+}
+
+body[data-font='dm-sans'] {
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+}
+
+body[data-font='space-grotesk'] {
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
 }
 
 body[data-font='serif'] {

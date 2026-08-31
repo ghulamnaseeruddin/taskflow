@@ -380,6 +380,16 @@ function renderSettingsContent(type) {
           <select id="fontSelect">
             <option value="inter" ${prefs.font === 'inter' ? 'selected' : ''}>Inter</option>
             <option value="poppins" ${prefs.font === 'poppins' ? 'selected' : ''}>Poppins</option>
+            <option value="roboto" ${prefs.font === 'roboto' ? 'selected' : ''}>Roboto</option>
+            <option value="raleway" ${prefs.font === 'raleway' ? 'selected' : ''}>Raleway</option>
+            <option value="lora" ${prefs.font === 'lora' ? 'selected' : ''}>Lora</option>
+            <option value="quicksand" ${prefs.font === 'quicksand' ? 'selected' : ''}>Quicksand</option>
+            <option value="manrope" ${prefs.font === 'manrope' ? 'selected' : ''}>Manrope</option>
+            <option value="montserrat" ${prefs.font === 'montserrat' ? 'selected' : ''}>Montserrat</option>
+            <option value="nunito" ${prefs.font === 'nunito' ? 'selected' : ''}>Nunito</option>
+            <option value="merriweather" ${prefs.font === 'merriweather' ? 'selected' : ''}>Merriweather</option>
+            <option value="dm-sans" ${prefs.font === 'dm-sans' ? 'selected' : ''}>DM Sans</option>
+            <option value="space-grotesk" ${prefs.font === 'space-grotesk' ? 'selected' : ''}>Space Grotesk</option>
             <option value="serif" ${prefs.font === 'serif' ? 'selected' : ''}>Classic Serif</option>
           </select>
         </div>

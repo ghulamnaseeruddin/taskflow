@@ -357,9 +357,13 @@ function renderSettingsContent(type) {
             <span class="theme-swatch sunset"></span>
             <span>Sunset</span>
           </button>
-          <button type="button" class="theme-option ${prefs.theme === 'midnight' ? 'selected' : ''}" data-theme="midnight">
-            <span class="theme-swatch midnight"></span>
-            <span>Midnight</span>
+          <button type="button" class="theme-option ${prefs.theme === 'ocean' ? 'selected' : ''}" data-theme="ocean">
+            <span class="theme-swatch ocean"></span>
+            <span>Ocean</span>
+          </button>
+          <button type="button" class="theme-option ${prefs.theme === 'graphite' ? 'selected' : ''}" data-theme="graphite">
+            <span class="theme-swatch graphite"></span>
+            <span>Graphite</span>
           </button>
           <button type="button" class="theme-option ${prefs.theme === 'mint' ? 'selected' : ''}" data-theme="mint">
             <span class="theme-swatch mint"></span>

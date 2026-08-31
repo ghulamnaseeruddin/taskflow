@@ -22,24 +22,44 @@
   --sidebar-width: 280px;
 }
 
-body[data-theme='midnight'] {
-  --bg: #141a2d;
-  --panel: #1b2238;
-  --panel-soft: #202a43;
-  --surface-rose: #ffb89d;
-  --surface-mint: #76d9b7;
-  --surface-lav: #b8aef8;
-  --surface-sky: #a8d5ff;
-  --ink: #edf4ff;
-  --muted: #b9c3de;
-  --line: rgba(188, 199, 226, 0.14);
-  --primary: #9eb8ff;
-  --primary-deep: #7d9cff;
-  --green: #6ecfb2;
-  --red: #ff9c9c;
-  --shadow-outer: 10px 10px 20px rgba(4, 8, 20, 0.45);
-  --shadow-inner-top: inset 4px 4px 10px rgba(255, 255, 255, 0.08);
-  --shadow-inner-bottom: inset -4px -4px 10px rgba(0, 0, 0, 0.35);
+body[data-theme='ocean'] {
+  --bg: #eaf7ff;
+  --panel: #f5fbff;
+  --panel-soft: #e4f4ff;
+  --surface-rose: #ffd9d6;
+  --surface-mint: #dffbf1;
+  --surface-lav: #e4e0ff;
+  --surface-sky: #d6f0ff;
+  --ink: #17324a;
+  --muted: #536f86;
+  --line: rgba(37, 64, 85, 0.12);
+  --primary: #5bb7f5;
+  --primary-deep: #2e8bd4;
+  --green: #4cb98a;
+  --red: #eb7a7a;
+  --shadow-outer: 9px 9px 18px rgba(52, 112, 160, 0.12);
+  --shadow-inner-top: inset 4px 4px 8px rgba(255, 255, 255, 0.85);
+  --shadow-inner-bottom: inset -4px -4px 8px rgba(38, 75, 102, 0.08);
+}
+
+body[data-theme='graphite'] {
+  --bg: #eef1f6;
+  --panel: #f9fafc;
+  --panel-soft: #e9edf3;
+  --surface-rose: #ffd8d0;
+  --surface-mint: #dff8ee;
+  --surface-lav: #e9e2ff;
+  --surface-sky: #dfeefd;
+  --ink: #1d2430;
+  --muted: #58697a;
+  --line: rgba(40, 54, 74, 0.12);
+  --primary: #7a87ff;
+  --primary-deep: #5e67d8;
+  --green: #4db297;
+  --red: #d86b6b;
+  --shadow-outer: 8px 8px 18px rgba(59, 73, 98, 0.12);
+  --shadow-inner-top: inset 4px 4px 8px rgba(255, 255, 255, 0.9);
+  --shadow-inner-bottom: inset -4px -4px 8px rgba(32, 40, 52, 0.06);
 }
 
 body[data-theme='mint'] {
@@ -230,7 +250,8 @@ img {
 }
 
 .theme-swatch.sunset { background: linear-gradient(135deg, #ffd5c8, #ff9a7a); }
-.theme-swatch.midnight { background: linear-gradient(135deg, #2f3b5b, #6f90ff); }
+.theme-swatch.ocean { background: linear-gradient(135deg, #d8f1ff, #5bb7f5); }
+.theme-swatch.graphite { background: linear-gradient(135deg, #dfe5ef, #7a87ff); }
 .theme-swatch.mint { background: linear-gradient(135deg, #d9fbe6, #6ad9aa); }
 .theme-swatch.lilac { background: linear-gradient(135deg, #e6dfff, #bfabff); }
 

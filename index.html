@@ -11,7 +11,9 @@
   <div class="auth-screen" id="authScreen">
     <div class="auth-card">
       <div class="brand">
-        <div class="brand-mark">TF</div>
+        <div class="brand-mark brand-mark--image">
+          <img src="/taskflow-logo.svg" alt="TaskFlow logo" />
+        </div>
         <div class="brand-name">TaskFlow</div>
       </div>
 
@@ -80,7 +82,9 @@
 
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <div class="brand-mark">TF</div>
+        <div class="brand-mark brand-mark--image">
+          <img src="/taskflow-logo.svg" alt="TaskFlow logo" />
+        </div>
         <div class="brand-name">TaskFlow</div>
       </div>
 
@@ -176,6 +180,20 @@
       <div class="progress-track" aria-hidden="true">
         <div class="progress-fill" id="progressFill" style="width:0%"></div>
       </div>
+
+      <div class="quick-add-bar">
+        <input id="quickAddInput" type="text" placeholder="Add a task..." />
+        <select id="quickAddPriority">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+        <input id="quickAddDueDate" type="date" />
+        <input id="quickAddTags" type="text" placeholder="tags, comma separated" />
+        <button type="button" id="quickAddBtn" class="btn-primary btn-primary--task">Add</button>
+      </div>
+
+      <div class="tag-filter-strip" id="tagFilterStrip"></div>
 
       <div class="board" id="board"></div>
     </main>

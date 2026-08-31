@@ -1,5 +1,6 @@
 import './style.css';
 
+const STORAGE_KEY = 'taskflow_state_v2';
 const USERS_KEY = 'taskflow_users_v1';
 const TASKS_KEY = 'taskflow_tasks_v1';
 const CURRENT_USER_KEY = 'taskflow_current_user_v1';
@@ -14,12 +15,34 @@ const countAll = document.getElementById('countAll');
 const countOpen = document.getElementById('countOpen');
 const countDone = document.getElementById('countDone');
 const modalRoot = document.getElementById('modalRoot');
+const tagFilterStrip = document.getElementById('tagFilterStrip');
+
+const DEFAULT_STATE = {
+  user: {
+    name: 'Productive User',
+    avatar: 'initials',
+    joinedDate: new Date().toISOString().slice(0, 10),
+    bio: '',
+  },
+  settings: {
+    theme: 'light',
+    density: 'comfortable',
+    notificationsEnabled: true,
+    soundEffects: false,
+    defaultPriority: 'medium',
+  },
+  tasks: [],
+};
 
 let currentFilter = 'all';
-let tasks = loadTasks();
-let currentUser = getCurrentUser();
+let selectedTagFilter = null;
+let currentUser = null;
 let editingTaskId = null;
 let isLoginMode = true;
+
+function cloneDefaultState() {
+  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
 
 function flash(message, type = 'success') {
   if (!flashWrap) return;
@@ -30,36 +53,134 @@ function flash(message, type = 'success') {
   setTimeout(() => el.remove(), 2600);
 }
 
-function saveTasks() {
-  localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+function getInitials(name, email) {
+  const source = (name && name.trim()) || (email && email.trim()) || 'U';
+  return source.charAt(0).toUpperCase();
 }
 
-function loadTasks() {
+function normalizeTask(task) {
+  return {
+    id: String(task.id || Date.now() + Math.random()),
+    title: String(task.title || 'Untitled task').trim(),
+    priority: ['low', 'medium', 'high'].includes(task.priority) ? task.priority : 'medium',
+    tags: Array.isArray(task.tags) ? task.tags.map((tag) => String(tag).trim()).filter(Boolean) : [],
+    subtasks: Array.isArray(task.subtasks)
+      ? task.subtasks.map((subtask) => ({
+          id: String(subtask.id || Date.now() + Math.random()),
+          title: String(subtask.title || '').trim(),
+          isCompleted: Boolean(subtask.isCompleted),
+        })).filter((subtask) => subtask.title)
+      : [],
+    dueDate: task.dueDate || null,
+    recurrence: ['none', 'daily', 'weekly', 'monthly'].includes(task.recurrence) ? task.recurrence : 'none',
+    isCompleted: Boolean(task.isCompleted),
+    createdAt: task.createdAt || new Date().toISOString(),
+  };
+}
+
+function normalizeUser(user) {
+  const safeUser = user || {};
+  return {
+    name: safeUser.name || 'Productive User',
+    avatar: safeUser.avatar || 'initials',
+    joinedDate: safeUser.joinedDate || new Date().toISOString().slice(0, 10),
+    bio: safeUser.bio || '',
+  };
+}
+
+function normalizeSettings(settings) {
+  const base = DEFAULT_STATE.settings;
+  return {
+    ...base,
+    ...(settings || {}),
+    theme: ['light', 'dark', 'sepia'].includes(settings?.theme) ? settings.theme : 'light',
+    density: ['compact', 'comfortable', 'spacious'].includes(settings?.density) ? settings.density : 'comfortable',
+    notificationsEnabled: settings?.notificationsEnabled !== false,
+    soundEffects: Boolean(settings?.soundEffects),
+    defaultPriority: ['low', 'medium', 'high'].includes(settings?.defaultPriority) ? settings.defaultPriority : 'medium',
+  };
+}
+
+function migrateLegacyState() {
+  const legacyTasks = (() => {
+    try {
+      const raw = localStorage.getItem(TASKS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.map(normalizeTask) : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const legacyUser = (() => {
+    try {
+      const raw = localStorage.getItem(CURRENT_USER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const legacySettings = (() => {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  })();
+
+  const merged = cloneDefaultState();
+  merged.tasks = legacyTasks.length ? legacyTasks : merged.tasks;
+  merged.user = normalizeUser(legacyUser || merged.user);
+  merged.settings = normalizeSettings(legacySettings || merged.settings);
+  return merged;
+}
+
+function loadAppState() {
   try {
-    const raw = localStorage.getItem(TASKS_KEY);
-    if (!raw) return [];
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      const migrated = migrateLegacyState();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const base = cloneDefaultState();
+    const safe = {
+      user: normalizeUser(parsed.user || base.user),
+      settings: normalizeSettings(parsed.settings || base.settings),
+      tasks: Array.isArray(parsed.tasks) ? parsed.tasks.map(normalizeTask) : base.tasks,
+    };
+
+    if (!parsed.user || !parsed.settings || !parsed.tasks) {
+      const migrated = migrateLegacyState();
+      const merged = {
+        user: normalizeUser(safe.user || migrated.user),
+        settings: normalizeSettings({ ...migrated.settings, ...safe.settings }),
+        tasks: safe.tasks.length ? safe.tasks : migrated.tasks,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      return merged;
+    }
+
+    return safe;
   } catch (error) {
-    console.error('Failed to load tasks:', error);
-    return [];
+    console.error('State migration error:', error);
+    const fallback = cloneDefaultState();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback));
+    return fallback;
   }
 }
 
-function getCurrentUser() {
-  try {
-    const raw = localStorage.getItem(CURRENT_USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    console.error('Failed to load current user:', error);
-    return null;
-  }
-}
-
-function setCurrentUser(user) {
-  currentUser = user;
-  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-  if (!user) localStorage.removeItem(CURRENT_USER_KEY);
+function saveAppState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    user: currentUser || appState.user,
+    settings: appState.settings,
+    tasks: appState.tasks,
+  }));
 }
 
 function getUsers() {
@@ -67,8 +188,7 @@ function getUsers() {
     const raw = localStorage.getItem(USERS_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error('Failed to parse users:', error);
+  } catch {
     return [];
   }
 }
@@ -77,15 +197,26 @@ function saveUsers(users) {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
 
-function getInitials(name, email) {
-  const source = (name && name.trim()) || (email && email.trim()) || 'U';
-  return source.charAt(0).toUpperCase();
+function getTasksForView() {
+  let items = [...appState.tasks];
+
+  if (currentFilter === 'open') {
+    items = items.filter((task) => !task.isCompleted);
+  } else if (currentFilter === 'done') {
+    items = items.filter((task) => task.isCompleted);
+  }
+
+  if (selectedTagFilter) {
+    items = items.filter((task) => (task.tags || []).includes(selectedTagFilter));
+  }
+
+  return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 function renderCounts() {
-  const total = tasks.length;
-  const open = tasks.filter((task) => !task.completed).length;
-  const done = tasks.filter((task) => task.completed).length;
+  const total = appState.tasks.length;
+  const open = appState.tasks.filter((task) => !task.isCompleted).length;
+  const done = appState.tasks.filter((task) => task.isCompleted).length;
 
   if (countAll) countAll.textContent = String(total);
   if (countOpen) countOpen.textContent = String(open);
@@ -95,16 +226,29 @@ function renderCounts() {
   if (progressFill) progressFill.style.width = `${percent}%`;
 }
 
-function filterTasks() {
-  if (currentFilter === 'all') return tasks;
-  if (currentFilter === 'open') return tasks.filter((task) => !task.completed);
-  if (currentFilter === 'done') return tasks.filter((task) => task.completed);
-  return tasks;
+function renderTagFilters() {
+  if (!tagFilterStrip) return;
+
+  const tags = [...new Set(appState.tasks.flatMap((task) => task.tags || []))];
+  const clearLabel = selectedTagFilter ? '<button type="button" class="tag-chip tag-chip--clear" data-tag="__clear__">Clear Filter</button>' : '';
+
+  tagFilterStrip.innerHTML = `${clearLabel}${tags.map((tag) => `
+    <button type="button" class="tag-chip ${selectedTagFilter === tag ? 'active' : ''}" data-tag="${tag}">${tag}</button>
+  `).join('')}`;
+
+  tagFilterStrip.querySelectorAll('[data-tag]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const value = button.getAttribute('data-tag');
+      selectedTagFilter = value === '__clear__' ? null : value;
+      renderBoard();
+      renderTagFilters();
+    });
+  });
 }
 
 function renderBoard() {
   if (!board) return;
-  const visibleTasks = filterTasks();
+  const visibleTasks = getTasksForView();
   board.innerHTML = '';
 
   if (!visibleTasks.length) {
@@ -118,232 +262,149 @@ function renderBoard() {
     return;
   }
 
-  visibleTasks
-    .slice()
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .forEach((task) => {
-      const card = document.createElement('div');
-      card.className = `task-card${task.completed ? ' completed' : ''}`;
-      card.dataset.id = String(task.id);
+  visibleTasks.forEach((task) => {
+    const card = document.createElement('article');
+    card.className = 'task-card-v2';
+    card.dataset.id = task.id;
+    card.style.setProperty('--priority-color', task.priority === 'high' ? '#EF4444' : task.priority === 'medium' ? '#F59E0B' : '#D4D4D8');
 
-      const checkBtn = document.createElement('button');
-      checkBtn.type = 'button';
-      checkBtn.className = 'check-btn';
-      checkBtn.textContent = task.completed ? '✓' : '';
-      checkBtn.setAttribute('aria-label', task.completed ? 'Mark task as incomplete' : 'Mark task as complete');
-      checkBtn.addEventListener('click', () => toggleTask(task.id));
+    const totalSubtasks = task.subtasks?.length || 0;
+    const doneSubtasks = (task.subtasks || []).filter((subtask) => subtask.isCompleted).length;
+    const subtaskProgress = totalSubtasks ? Math.round((doneSubtasks / totalSubtasks) * 100) : 0;
 
-      const body = document.createElement('div');
-      body.className = 'task-body';
+    const tagsMarkup = (task.tags || []).map((tag) => `<span class="task-tag">${tag}</span>`).join('');
 
-      const titleRow = document.createElement('div');
-      titleRow.className = 'task-title-row';
+    card.innerHTML = `
+      <div class="task-card-v2__inner">
+        <div class="task-card-v2__check-wrap">
+          <button type="button" class="task-check ${task.isCompleted ? 'is-done' : ''}" data-action="toggle-task" data-id="${task.id}">${task.isCompleted ? '✓' : ''}</button>
+        </div>
 
-      const title = document.createElement('div');
-      title.className = 'task-title';
-      title.textContent = task.title;
+        <div class="task-card-v2__content">
+          <div class="task-card-v2__topline">
+            <h3>${task.title}</h3>
+            <span class="task-priority priority-${task.priority}">${task.priority}</span>
+          </div>
 
-      const priorityBadge = document.createElement('span');
-      priorityBadge.className = `badge badge-${task.priority || 'low'}`;
-      priorityBadge.textContent = task.priority || 'low';
+          <div class="task-card-v2__meta">
+            ${task.dueDate ? `<span>Due: ${new Date(task.dueDate).toLocaleDateString()}</span>` : '<span>No due date</span>'}
+            <span>${task.recurrence}</span>
+          </div>
 
-      const categoryBadge = document.createElement('span');
-      categoryBadge.className = 'badge badge-category';
-      categoryBadge.textContent = task.category || 'General';
+          <div class="task-card-v2__tags">${tagsMarkup || '<span class="task-tag task-tag--muted">General</span>'}</div>
 
-      titleRow.appendChild(title);
-      titleRow.appendChild(priorityBadge);
-      titleRow.appendChild(categoryBadge);
+          <div class="task-progress-row">
+            <div class="task-progress-bar"><span style="width:${subtaskProgress}%"></span></div>
+            <small>${subtaskProgress}% complete</small>
+          </div>
 
-      const notes = document.createElement('p');
-      notes.className = 'task-notes';
-      notes.textContent = task.description || 'No description';
+          <div class="subtask-list">
+            ${(task.subtasks || []).map((subtask) => `
+              <label class="subtask-item">
+                <input data-action="toggle-subtask" data-task-id="${task.id}" data-subtask-id="${subtask.id}" type="checkbox" ${subtask.isCompleted ? 'checked' : ''} />
+                <span>${subtask.title}</span>
+              </label>
+            `).join('') || '<div class="subtask-empty">No subtasks yet</div>'}
+          </div>
 
-      const meta = document.createElement('div');
-      meta.className = 'task-meta';
+          <div class="task-card-v2__actions">
+            <button type="button" class="task-mini-btn" data-action="add-subtask" data-id="${task.id}">+ subtask</button>
+            <button type="button" class="task-mini-btn" data-action="edit-task" data-id="${task.id}">Edit</button>
+            <button type="button" class="task-mini-btn danger" data-action="delete-task" data-id="${task.id}">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
 
-      if (task.dueDate) {
-        const dueDate = document.createElement('span');
-        dueDate.textContent = `Due: ${new Date(task.dueDate).toLocaleDateString()}`;
-        meta.appendChild(dueDate);
+    card.querySelectorAll('[data-action]').forEach((button) => {
+      const action = button.dataset.action;
+      const id = button.dataset.id;
+      if (action === 'toggle-task') {
+        button.addEventListener('click', () => toggleTaskCompletion(id));
       }
-
-      const createdDate = document.createElement('span');
-      createdDate.textContent = `Created: ${new Date(task.createdAt).toLocaleDateString()}`;
-      meta.appendChild(createdDate);
-
-      body.appendChild(titleRow);
-      body.appendChild(notes);
-      body.appendChild(meta);
-
-      const actions = document.createElement('div');
-      actions.className = 'task-actions';
-
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'icon-btn';
-      editBtn.textContent = '✎';
-      editBtn.setAttribute('aria-label', 'Edit task');
-      editBtn.addEventListener('click', () => openTaskModal(task.id));
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.type = 'button';
-      deleteBtn.className = 'icon-btn delete';
-      deleteBtn.textContent = '✕';
-      deleteBtn.setAttribute('aria-label', 'Delete task');
-      deleteBtn.addEventListener('click', () => deleteTask(task.id));
-
-      actions.appendChild(editBtn);
-      actions.appendChild(deleteBtn);
-
-      card.appendChild(checkBtn);
-      card.appendChild(body);
-      card.appendChild(actions);
-      board.appendChild(card);
+      if (action === 'add-subtask') {
+        button.addEventListener('click', () => addSubtaskPrompt(id));
+      }
+      if (action === 'edit-task') {
+        button.addEventListener('click', () => openTaskModal(id));
+      }
+      if (action === 'delete-task') {
+        button.addEventListener('click', () => deleteTask(id));
+      }
     });
-}
 
-function loadPreferences() {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    const fallback = {
-      theme: 'sunset',
-      font: 'inter',
-      density: 'comfortable',
-      notifications: {
-        taskReminders: true,
-        loginAlerts: true,
-        desktopPopups: true,
-      },
-    };
+    card.querySelectorAll('[data-action="toggle-subtask"]').forEach((input) => {
+      input.addEventListener('change', (event) => {
+        const taskId = event.target.dataset.taskId;
+        const subtaskId = event.target.dataset.subtaskId;
+        toggleSubtask(taskId, subtaskId, event.target.checked);
+      });
+    });
 
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return {
-      ...fallback,
-      ...parsed,
-      notifications: {
-        ...fallback.notifications,
-        ...(parsed.notifications || {}),
-      },
-    };
-  } catch (error) {
-    console.error('Failed to load preferences:', error);
-    return {
-      theme: 'sunset',
-      font: 'inter',
-      density: 'comfortable',
-      notifications: {
-        taskReminders: true,
-        loginAlerts: true,
-        desktopPopups: true,
-      },
-    };
-  }
-}
-
-function savePreferences(prefs) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(prefs));
+    board.appendChild(card);
+  });
 }
 
 function applyAppearanceSettings() {
-  const prefs = loadPreferences();
-  document.body.dataset.theme = prefs.theme || 'sunset';
-  document.body.dataset.font = prefs.font || 'inter';
-  document.body.dataset.density = prefs.density || 'comfortable';
+  const { theme, density, notificationsEnabled } = appState.settings;
+  document.body.dataset.theme = theme || 'light';
+  document.body.dataset.density = density || 'comfortable';
+  document.body.dataset.notifications = String(Boolean(notificationsEnabled));
 }
 
 function renderUserPanel() {
-  if (!currentUser) return;
-
+  const user = currentUser || appState.user;
   const userName = document.getElementById('userName');
   const avatar = document.getElementById('avatar');
 
-  const name = currentUser.name || currentUser.email.split('@')[0];
-  const initial = getInitials(currentUser.name, currentUser.email);
-
-  if (userName) userName.textContent = name;
-  if (avatar) avatar.textContent = initial;
+  if (userName) userName.textContent = user.name || 'Productive User';
+  if (avatar) avatar.textContent = getInitials(user.name, user.email || '');
 }
 
 function renderSettingsContent(type) {
   const settingsContent = document.getElementById('settingsContent');
   const profileTitle = document.getElementById('profileTitle');
-  const prefs = loadPreferences();
+  const settings = appState.settings;
 
   if (!settingsContent || !profileTitle) return;
 
   if (type === 'account') {
     profileTitle.textContent = 'Account settings';
     settingsContent.innerHTML = `
-      <form id="accountSettingsForm" class="settings-form">
-        <div class="profile-avatar-wrap">
-          <div class="profile-avatar" id="profileAvatar">${getInitials(currentUser?.name, currentUser?.email)}</div>
+      <div class="profile-editor-grid">
+        <div class="profile-editor-card">
+          <div class="profile-avatar-wrap">
+            <div class="profile-avatar">${getInitials(appState.user.name, '')}</div>
+          </div>
+          <div class="field">
+            <label>Name</label>
+            <input id="profileNameInput" type="text" value="${(appState.user.name || '').replace(/"/g, '&quot;')}" />
+          </div>
+          <div class="field">
+            <label>Bio</label>
+            <textarea id="profileBioInput" rows="3">${(appState.user.bio || '').replace(/"/g, '&quot;')}</textarea>
+          </div>
         </div>
-
-        <div class="field">
-          <label for="profileNameInput">Display name</label>
-          <input id="profileNameInput" type="text" value="${(currentUser?.name || '').replace(/"/g, '&quot;')}" placeholder="Your name" />
-        </div>
-
-        <div class="field">
-          <label for="profileEmailInput">Email</label>
-          <input id="profileEmailInput" type="email" value="${(currentUser?.email || '').replace(/"/g, '&quot;')}" placeholder="you@example.com" />
-        </div>
-
-        <div class="field">
-          <label for="profilePasswordInput">Password</label>
-          <input id="profilePasswordInput" type="password" placeholder="Update password" />
-        </div>
-
-        <div class="profile-actions">
-          <button type="button" class="btn-ghost btn-ghost--light" id="cancelProfilePanel">Cancel</button>
-          <button type="submit" class="btn-primary btn-primary--small">Save changes</button>
-        </div>
-      </form>
+      </div>
+      <div class="profile-actions">
+        <button type="button" class="btn-ghost btn-ghost--light" id="cancelProfilePanel">Cancel</button>
+        <button type="button" class="btn-primary btn-primary--small" id="saveAccountBtn">Save changes</button>
+      </div>
     `;
 
-    const form = document.getElementById('accountSettingsForm');
-    const closeBtn = document.getElementById('cancelProfilePanel');
-    closeBtn?.addEventListener('click', () => closeProfilePanel());
-    form?.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const profileNameInput = document.getElementById('profileNameInput');
-      const profileEmailInput = document.getElementById('profileEmailInput');
-      const profilePasswordInput = document.getElementById('profilePasswordInput');
-
-      const updatedName = (profileNameInput?.value || '').trim();
-      const updatedEmail = (profileEmailInput?.value || '').trim();
-      const updatedPassword = (profilePasswordInput?.value || '').trim();
-
-      if (!updatedName || !updatedEmail) {
-        flash('Name and email are required', 'error');
-        return;
-      }
-
-      const users = getUsers();
-      const currentUserIndex = users.findIndex((user) => user.id === currentUser?.id);
-
-      if (currentUserIndex >= 0) {
-        users[currentUserIndex] = {
-          ...users[currentUserIndex],
-          name: updatedName,
-          email: updatedEmail,
-          ...(updatedPassword ? { password: updatedPassword } : {}),
-        };
-        saveUsers(users);
-      }
-
-      currentUser = {
-        ...currentUser,
-        name: updatedName,
-        email: updatedEmail,
-      };
-      setCurrentUser(currentUser);
+    document.getElementById('saveAccountBtn')?.addEventListener('click', () => {
+      const name = document.getElementById('profileNameInput')?.value.trim() || 'Productive User';
+      const bio = document.getElementById('profileBioInput')?.value.trim() || '';
+      appState.user.name = name;
+      appState.user.bio = bio;
+      currentUser = { ...appState.user };
+      saveAppState();
       renderUserPanel();
       closeProfilePanel();
-      flash('Profile updated successfully', 'success');
+      flash('Account updated', 'success');
     });
+
+    document.getElementById('cancelProfilePanel')?.addEventListener('click', closeProfilePanel);
     return;
   }
 
@@ -353,56 +414,20 @@ function renderSettingsContent(type) {
       <div class="settings-block">
         <div class="settings-section-title">Theme</div>
         <div class="theme-grid">
-          <button type="button" class="theme-option ${prefs.theme === 'sunset' ? 'selected' : ''}" data-theme="sunset">
-            <span class="theme-swatch sunset"></span>
-            <span>Sunset</span>
-          </button>
-          <button type="button" class="theme-option ${prefs.theme === 'ocean' ? 'selected' : ''}" data-theme="ocean">
-            <span class="theme-swatch ocean"></span>
-            <span>Ocean</span>
-          </button>
-          <button type="button" class="theme-option ${prefs.theme === 'graphite' ? 'selected' : ''}" data-theme="graphite">
-            <span class="theme-swatch graphite"></span>
-            <span>Graphite</span>
-          </button>
-          <button type="button" class="theme-option ${prefs.theme === 'mint' ? 'selected' : ''}" data-theme="mint">
-            <span class="theme-swatch mint"></span>
-            <span>Mint</span>
-          </button>
-          <button type="button" class="theme-option ${prefs.theme === 'lilac' ? 'selected' : ''}" data-theme="lilac">
-            <span class="theme-swatch lilac"></span>
-            <span>Lilac</span>
-          </button>
+          <button type="button" class="theme-option ${settings.theme === 'light' ? 'selected' : ''}" data-theme="light"><span class="theme-swatch light"></span><span>Light</span></button>
+          <button type="button" class="theme-option ${settings.theme === 'dark' ? 'selected' : ''}" data-theme="dark"><span class="theme-swatch dark"></span><span>Dark</span></button>
+          <button type="button" class="theme-option ${settings.theme === 'sepia' ? 'selected' : ''}" data-theme="sepia"><span class="theme-swatch sepia"></span><span>Sepia</span></button>
         </div>
 
         <div class="settings-row">
-          <label for="fontSelect">Font style</label>
-          <select id="fontSelect">
-            <option value="inter" ${prefs.font === 'inter' ? 'selected' : ''}>Inter</option>
-            <option value="poppins" ${prefs.font === 'poppins' ? 'selected' : ''}>Poppins</option>
-            <option value="roboto" ${prefs.font === 'roboto' ? 'selected' : ''}>Roboto</option>
-            <option value="raleway" ${prefs.font === 'raleway' ? 'selected' : ''}>Raleway</option>
-            <option value="lora" ${prefs.font === 'lora' ? 'selected' : ''}>Lora</option>
-            <option value="quicksand" ${prefs.font === 'quicksand' ? 'selected' : ''}>Quicksand</option>
-            <option value="manrope" ${prefs.font === 'manrope' ? 'selected' : ''}>Manrope</option>
-            <option value="montserrat" ${prefs.font === 'montserrat' ? 'selected' : ''}>Montserrat</option>
-            <option value="nunito" ${prefs.font === 'nunito' ? 'selected' : ''}>Nunito</option>
-            <option value="merriweather" ${prefs.font === 'merriweather' ? 'selected' : ''}>Merriweather</option>
-            <option value="dm-sans" ${prefs.font === 'dm-sans' ? 'selected' : ''}>DM Sans</option>
-            <option value="space-grotesk" ${prefs.font === 'space-grotesk' ? 'selected' : ''}>Space Grotesk</option>
-            <option value="serif" ${prefs.font === 'serif' ? 'selected' : ''}>Classic Serif</option>
-          </select>
-        </div>
-
-        <div class="settings-row">
-          <label for="densitySelect">Layout density</label>
+          <label for="densitySelect">Density</label>
           <select id="densitySelect">
-            <option value="comfortable" ${prefs.density === 'comfortable' ? 'selected' : ''}>Comfortable</option>
-            <option value="compact" ${prefs.density === 'compact' ? 'selected' : ''}>Compact</option>
+            <option value="compact" ${settings.density === 'compact' ? 'selected' : ''}>Compact</option>
+            <option value="comfortable" ${settings.density === 'comfortable' ? 'selected' : ''}>Comfortable</option>
+            <option value="spacious" ${settings.density === 'spacious' ? 'selected' : ''}>Spacious</option>
           </select>
         </div>
       </div>
-
       <div class="profile-actions">
         <button type="button" class="btn-ghost btn-ghost--light" id="cancelProfilePanel">Cancel</button>
         <button type="button" class="btn-primary btn-primary--small" id="saveAppearanceBtn">Save appearance</button>
@@ -417,68 +442,65 @@ function renderSettingsContent(type) {
     });
 
     document.getElementById('saveAppearanceBtn')?.addEventListener('click', () => {
-      const selectedTheme = document.querySelector('.theme-option.selected')?.dataset.theme || prefs.theme;
-      const font = document.getElementById('fontSelect')?.value || prefs.font;
-      const density = document.getElementById('densitySelect')?.value || prefs.density;
-
-      const nextPrefs = {
-        ...prefs,
-        theme: selectedTheme,
-        font,
-        density,
-      };
-
-      savePreferences(nextPrefs);
+      const selectedTheme = document.querySelector('.theme-option.selected')?.dataset.theme || settings.theme;
+      const density = document.getElementById('densitySelect')?.value || settings.density;
+      appState.settings.theme = selectedTheme;
+      appState.settings.density = density;
+      saveAppState();
       applyAppearanceSettings();
       closeProfilePanel();
       flash('Appearance updated', 'success');
     });
 
-    document.getElementById('cancelProfilePanel')?.addEventListener('click', () => closeProfilePanel());
+    document.getElementById('cancelProfilePanel')?.addEventListener('click', closeProfilePanel);
     return;
   }
 
-  profileTitle.textContent = 'Notification settings';
+  profileTitle.textContent = 'Notifications & backups';
   settingsContent.innerHTML = `
     <div class="settings-block">
       <label class="toggle-row">
-        <span>Task reminders</span>
-        <input type="checkbox" id="taskReminders" ${prefs.notifications.taskReminders ? 'checked' : ''} />
+        <span>Notifications</span>
+        <input id="notificationsEnabled" type="checkbox" ${settings.notificationsEnabled ? 'checked' : ''} />
       </label>
-
       <label class="toggle-row">
-        <span>Login alerts</span>
-        <input type="checkbox" id="loginAlerts" ${prefs.notifications.loginAlerts ? 'checked' : ''} />
+        <span>Sound effects</span>
+        <input id="soundEffects" type="checkbox" ${settings.soundEffects ? 'checked' : ''} />
       </label>
-
-      <label class="toggle-row">
-        <span>Desktop popups</span>
-        <input type="checkbox" id="desktopPopups" ${prefs.notifications.desktopPopups ? 'checked' : ''} />
-      </label>
+      <div class="settings-row">
+        <label for="defaultPrioritySelect">Default priority</label>
+        <select id="defaultPrioritySelect">
+          <option value="low" ${settings.defaultPriority === 'low' ? 'selected' : ''}>Low</option>
+          <option value="medium" ${settings.defaultPriority === 'medium' ? 'selected' : ''}>Medium</option>
+          <option value="high" ${settings.defaultPriority === 'high' ? 'selected' : ''}>High</option>
+        </select>
+      </div>
+      <div class="settings-row settings-row--stacked">
+        <button type="button" class="btn-ghost btn-ghost--light export-btn" id="exportDataBtn">Export Application Data</button>
+        <label class="import-file-label">
+          <input type="file" accept="application/json" id="importDataInput" />
+          <span>Import Application Data</span>
+        </label>
+      </div>
     </div>
-
     <div class="profile-actions">
       <button type="button" class="btn-ghost btn-ghost--light" id="cancelProfilePanel">Cancel</button>
-      <button type="button" class="btn-primary btn-primary--small" id="saveNotificationBtn">Save notifications</button>
+      <button type="button" class="btn-primary btn-primary--small" id="saveSettingsBtn">Save settings</button>
     </div>
   `;
 
-  document.getElementById('saveNotificationBtn')?.addEventListener('click', () => {
-    const nextPrefs = {
-      ...prefs,
-      notifications: {
-        taskReminders: document.getElementById('taskReminders')?.checked ?? true,
-        loginAlerts: document.getElementById('loginAlerts')?.checked ?? true,
-        desktopPopups: document.getElementById('desktopPopups')?.checked ?? true,
-      },
-    };
-
-    savePreferences(nextPrefs);
+  document.getElementById('saveSettingsBtn')?.addEventListener('click', () => {
+    appState.settings.notificationsEnabled = document.getElementById('notificationsEnabled')?.checked ?? true;
+    appState.settings.soundEffects = document.getElementById('soundEffects')?.checked ?? false;
+    appState.settings.defaultPriority = document.getElementById('defaultPrioritySelect')?.value || 'medium';
+    saveAppState();
     closeProfilePanel();
-    flash('Notification preferences saved', 'success');
+    flash('Settings saved', 'success');
   });
 
-  document.getElementById('cancelProfilePanel')?.addEventListener('click', () => closeProfilePanel());
+  document.getElementById('exportDataBtn')?.addEventListener('click', exportAppStateAsJson);
+  document.getElementById('importDataInput')?.addEventListener('change', handleImportAppState);
+  document.getElementById('cancelProfilePanel')?.addEventListener('click', closeProfilePanel);
 }
 
 function closeProfilePanel() {
@@ -487,14 +509,57 @@ function closeProfilePanel() {
   overlay?.setAttribute('aria-hidden', 'true');
 }
 
+function exportAppStateAsJson() {
+  const payload = JSON.stringify(appState, null, 2);
+  const blob = new Blob([payload], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'taskflow-backup.json';
+  anchor.click();
+  URL.revokeObjectURL(url);
+  flash('Application data exported', 'success');
+}
+
+function handleImportAppState(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || '{}'));
+      const safeState = {
+        user: normalizeUser(parsed.user || DEFAULT_STATE.user),
+        settings: normalizeSettings(parsed.settings || DEFAULT_STATE.settings),
+        tasks: Array.isArray(parsed.tasks) ? parsed.tasks.map(normalizeTask) : [],
+      };
+      appState = safeState;
+      currentUser = { ...appState.user };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      applyAppearanceSettings();
+      renderUserPanel();
+      renderCounts();
+      renderBoard();
+      renderTagFilters();
+      flash('Application data restored', 'success');
+    } catch (error) {
+      console.error('Import failed:', error);
+      flash('The selected file is not valid TaskFlow data', 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
 function renderAuth() {
   if (!authScreen || !appShell) return;
 
-  if (currentUser) {
+  if (currentUser || appState.user) {
     authScreen.style.display = 'none';
     appShell.style.display = 'flex';
     renderUserPanel();
     renderCounts();
+    renderTagFilters();
     renderBoard();
   } else {
     authScreen.style.display = 'grid';
@@ -502,34 +567,71 @@ function renderAuth() {
   }
 }
 
-function createTask(task) {
-  const newTask = {
-    id: Date.now() + Math.floor(Math.random() * 1000),
-    title: task.title,
-    description: task.description || '',
-    category: task.category || 'General',
-    priority: task.priority || 'low',
-    dueDate: task.dueDate || '',
-    completed: Boolean(task.completed),
+function addTask(taskPayload) {
+  const normalizedTask = normalizeTask({
+    ...taskPayload,
+    id: Date.now() + Math.random(),
     createdAt: new Date().toISOString(),
-  };
+    recurrence: taskPayload.recurrence || 'none',
+    isCompleted: false,
+    priority: taskPayload.priority || appState.settings.defaultPriority || 'medium',
+    tags: Array.isArray(taskPayload.tags) ? taskPayload.tags : [],
+    subtasks: Array.isArray(taskPayload.subtasks) ? taskPayload.subtasks : [],
+  });
 
-  tasks.unshift(newTask);
-  saveTasks();
+  appState.tasks.unshift(normalizedTask);
+  saveAppState();
+  renderCounts();
+  renderTagFilters();
+  renderBoard();
+}
+
+function toggleTaskCompletion(taskId) {
+  appState.tasks = appState.tasks.map((task) => {
+    if (task.id === taskId) {
+      return { ...task, isCompleted: !task.isCompleted };
+    }
+    return task;
+  });
+  saveAppState();
   renderCounts();
   renderBoard();
 }
 
-function toggleTask(taskId) {
-  tasks = tasks.map((task) => {
-    if (task.id === taskId) {
-      return { ...task, completed: !task.completed };
-    }
-    return task;
+function toggleSubtask(taskId, subtaskId, isChecked) {
+  appState.tasks = appState.tasks.map((task) => {
+    if (task.id !== taskId) return task;
+    return {
+      ...task,
+      subtasks: (task.subtasks || []).map((subtask) =>
+        subtask.id === subtaskId ? { ...subtask, isCompleted: isChecked } : subtask
+      ),
+    };
   });
-
-  saveTasks();
+  saveAppState();
   renderCounts();
+  renderBoard();
+}
+
+function addSubtaskPrompt(taskId) {
+  const value = window.prompt('Add a subtask:');
+  if (!value || !value.trim()) return;
+
+  appState.tasks = appState.tasks.map((task) => {
+    if (task.id !== taskId) return task;
+    return {
+      ...task,
+      subtasks: [
+        ...(task.subtasks || []),
+        {
+          id: String(Date.now() + Math.random()),
+          title: value.trim(),
+          isCompleted: false,
+        },
+      ],
+    };
+  });
+  saveAppState();
   renderBoard();
 }
 
@@ -537,23 +639,24 @@ function deleteTask(taskId) {
   const confirmed = window.confirm('Delete this task permanently?');
   if (!confirmed) return;
 
-  tasks = tasks.filter((task) => task.id !== taskId);
-  saveTasks();
+  appState.tasks = appState.tasks.filter((task) => task.id !== taskId);
+  saveAppState();
   renderCounts();
+  renderTagFilters();
   renderBoard();
   flash('Task deleted', 'success');
 }
 
 function updateTask(taskId, updates) {
-  tasks = tasks.map((task) => {
+  appState.tasks = appState.tasks.map((task) => {
     if (task.id === taskId) {
-      return { ...task, ...updates };
+      return normalizeTask({ ...task, ...updates });
     }
     return task;
   });
-
-  saveTasks();
+  saveAppState();
   renderCounts();
+  renderTagFilters();
   renderBoard();
 }
 
@@ -565,7 +668,7 @@ function closeTaskModal() {
 function openTaskModal(taskId = null) {
   if (!modalRoot) return;
 
-  const task = tasks.find((item) => item.id === taskId);
+  const task = appState.tasks.find((item) => item.id === taskId);
   const isEdit = Boolean(task);
   editingTaskId = taskId;
 
@@ -582,7 +685,7 @@ function openTaskModal(taskId = null) {
           <input id="taskTitle" name="title" type="text" value="${(task && task.title) || ''}" required />
 
           <label for="taskDescription">Description</label>
-          <textarea id="taskDescription" name="description" rows="4">${(task && task.description) || ''}</textarea>
+          <textarea id="taskDescription" name="description" rows="3">${(task && task.description) || ''}</textarea>
 
           <div class="form-row">
             <div>
@@ -593,15 +696,14 @@ function openTaskModal(taskId = null) {
                 <option value="high" ${task && task.priority === 'high' ? 'selected' : ''}>High</option>
               </select>
             </div>
-
             <div>
-              <label for="taskCategory">Category</label>
-              <input id="taskCategory" name="category" type="text" value="${(task && task.category) || 'General'}" />
+              <label for="taskDueDate">Due date</label>
+              <input id="taskDueDate" name="dueDate" type="date" value="${(task && task.dueDate) || ''}" />
             </div>
           </div>
 
-          <label for="taskDueDate">Due date</label>
-          <input id="taskDueDate" name="dueDate" type="date" value="${(task && task.dueDate) || ''}" />
+          <label for="taskTags">Tags</label>
+          <input id="taskTags" name="tags" type="text" value="${(task && task.tags && task.tags.join(', ')) || ''}" />
 
           <div class="modal-actions">
             <button type="button" class="btn-ghost btn-ghost--light" id="cancelModal">Cancel</button>
@@ -626,14 +728,16 @@ function openTaskModal(taskId = null) {
 
   form?.addEventListener('submit', (event) => {
     event.preventDefault();
-
-    const formData = new FormData(form);
     const payload = {
-      title: String(formData.get('title') || '').trim(),
-      description: String(formData.get('description') || '').trim(),
-      priority: String(formData.get('priority') || 'low'),
-      category: String(formData.get('category') || 'General').trim() || 'General',
-      dueDate: String(formData.get('dueDate') || '').trim(),
+      title: String(new FormData(form).get('title') || '').trim(),
+      dueDate: String(new FormData(form).get('dueDate') || '').trim(),
+      priority: String(new FormData(form).get('priority') || appState.settings.defaultPriority || 'medium'),
+      tags: String(new FormData(form).get('tags') || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+      recurrence: 'none',
+      subtasks: task?.subtasks || [],
     };
 
     if (!payload.title) {
@@ -645,12 +749,41 @@ function openTaskModal(taskId = null) {
       updateTask(editingTaskId, payload);
       flash('Task updated', 'success');
     } else {
-      createTask(payload);
+      addTask(payload);
       flash('Task created', 'success');
     }
 
     closeTaskModal();
   });
+}
+
+function quickAddTask() {
+  const input = document.getElementById('quickAddInput');
+  const prioritySelect = document.getElementById('quickAddPriority');
+  const dueDateInput = document.getElementById('quickAddDueDate');
+  const tagsInput = document.getElementById('quickAddTags');
+
+  const title = input?.value.trim();
+  if (!title) {
+    input?.classList.add('shake');
+    setTimeout(() => input?.classList.remove('shake'), 300);
+    flash('Task title is required', 'error');
+    return;
+  }
+
+  addTask({
+    title,
+    priority: prioritySelect?.value || appState.settings.defaultPriority || 'medium',
+    dueDate: dueDateInput?.value || null,
+    tags: (tagsInput?.value || '')
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  });
+
+  if (input) input.value = '';
+  if (tagsInput) tagsInput.value = '';
+  if (dueDateInput) dueDateInput.value = '';
 }
 
 function setAuthMode(loginMode) {
@@ -703,14 +836,14 @@ function setupAuthHandlers() {
 
     if (isLoginMode) {
       const user = users.find((entry) => entry.email.toLowerCase() === email.toLowerCase() && entry.password === password);
-
       if (!user) {
         flash('Invalid email or password', 'error');
         return;
       }
 
       currentUser = { id: user.id, email: user.email, name: user.name || user.email.split('@')[0] };
-      setCurrentUser(currentUser);
+      appState.user = { ...appState.user, name: currentUser.name };
+      saveAppState();
       renderAuth();
       flash('You are logged in. Continue to dashboard.', 'success');
       return;
@@ -731,9 +864,9 @@ function setupAuthHandlers() {
 
     users.push(newUser);
     saveUsers(users);
-
     currentUser = { id: newUser.id, email: newUser.email, name: newUser.name };
-    setCurrentUser(currentUser);
+    appState.user = { ...appState.user, name: currentUser.name };
+    saveAppState();
     renderAuth();
     flash('You are logged in. Continue to dashboard.', 'success');
   });
@@ -741,6 +874,7 @@ function setupAuthHandlers() {
 
 function setupDashboardHandlers() {
   const newTaskBtn = document.getElementById('newTaskBtn');
+  const quickAddBtn = document.getElementById('quickAddBtn');
   const logoutBtn = document.getElementById('logoutBtn');
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
@@ -754,10 +888,18 @@ function setupDashboardHandlers() {
   const downloadOptions = document.querySelectorAll('.download-option');
 
   newTaskBtn?.addEventListener('click', () => openTaskModal());
+  quickAddBtn?.addEventListener('click', quickAddTask);
+  document.getElementById('quickAddInput')?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      quickAddTask();
+    }
+  });
 
   logoutBtn?.addEventListener('click', () => {
-    setCurrentUser(null);
     currentUser = null;
+    appState.user = normalizeUser();
+    saveAppState();
     renderAuth();
     flash('Logged out successfully', 'success');
   });
@@ -766,13 +908,6 @@ function setupDashboardHandlers() {
     const shouldOpen = profileMenu && profileMenu.classList.contains('hidden');
     profileMenu?.classList.toggle('hidden', !shouldOpen);
     profileTrigger.setAttribute('aria-expanded', String(shouldOpen));
-  });
-
-  profileTrigger?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      profileTrigger.click();
-    }
   });
 
   document.addEventListener('click', (event) => {
@@ -792,15 +927,10 @@ function setupDashboardHandlers() {
       profileTrigger?.setAttribute('aria-expanded', 'false');
 
       if (!action) return;
-      if (action === 'account') {
-        renderSettingsContent('account');
-      } else if (action === 'appearance') {
-        renderSettingsContent('appearance');
-      } else if (action === 'notifications') {
-        renderSettingsContent('notifications');
-      } else {
-        renderSettingsContent('account');
-      }
+      if (action === 'account') renderSettingsContent('account');
+      else if (action === 'appearance') renderSettingsContent('appearance');
+      else if (action === 'notifications') renderSettingsContent('notifications');
+      else renderSettingsContent('account');
 
       profileOverlay?.classList.remove('hidden');
       profileOverlay?.setAttribute('aria-hidden', 'false');
@@ -839,7 +969,8 @@ function setupDashboardHandlers() {
 }
 
 function initialize() {
-  currentUser = getCurrentUser();
+  appState = loadAppState();
+  currentUser = { ...appState.user };
   applyAppearanceSettings();
   setAuthMode(true);
   setupAuthHandlers();
@@ -847,4 +978,5 @@ function initialize() {
   renderAuth();
 }
 
+let appState = loadAppState();
 initialize();

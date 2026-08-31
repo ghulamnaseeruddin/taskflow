@@ -5,6 +5,9 @@ instance/
 *.db
 .venv/
 venv/
+node_modules/
+dist/
+.vite/
 .DS_Store
 *.egg-info/
 .vscode/

@@ -22,6 +22,80 @@
   --sidebar-width: 280px;
 }
 
+body[data-theme='midnight'] {
+  --bg: #141a2d;
+  --panel: #1b2238;
+  --panel-soft: #202a43;
+  --surface-rose: #ffb89d;
+  --surface-mint: #76d9b7;
+  --surface-lav: #b8aef8;
+  --surface-sky: #a8d5ff;
+  --ink: #edf4ff;
+  --muted: #b9c3de;
+  --line: rgba(188, 199, 226, 0.14);
+  --primary: #9eb8ff;
+  --primary-deep: #7d9cff;
+  --green: #6ecfb2;
+  --red: #ff9c9c;
+  --shadow-outer: 10px 10px 20px rgba(4, 8, 20, 0.45);
+  --shadow-inner-top: inset 4px 4px 10px rgba(255, 255, 255, 0.08);
+  --shadow-inner-bottom: inset -4px -4px 10px rgba(0, 0, 0, 0.35);
+}
+
+body[data-theme='mint'] {
+  --bg: #eafaf3;
+  --panel: #f4fff9;
+  --panel-soft: #e4f7ee;
+  --surface-rose: #ffd9c9;
+  --surface-mint: #d9f9ea;
+  --surface-lav: #e5defd;
+  --surface-sky: #dff5ff;
+  --ink: #1e2d2a;
+  --muted: #59706a;
+  --line: rgba(46, 78, 68, 0.12);
+  --primary: #63d7a2;
+  --primary-deep: #3fb98d;
+  --green: #52c79d;
+  --red: #e57a78;
+  --shadow-outer: 8px 8px 18px rgba(79, 134, 116, 0.12);
+  --shadow-inner-top: inset 4px 4px 8px rgba(255, 255, 255, 0.8);
+  --shadow-inner-bottom: inset -4px -4px 8px rgba(60, 112, 93, 0.07);
+}
+
+body[data-theme='lilac'] {
+  --bg: #f3eeff;
+  --panel: #fbf8ff;
+  --panel-soft: #efe8ff;
+  --surface-rose: #ffd6d6;
+  --surface-mint: #d8f6ea;
+  --surface-lav: #e4dcff;
+  --surface-sky: #dfeafc;
+  --ink: #2a2140;
+  --muted: #665d7f;
+  --line: rgba(81, 65, 116, 0.12);
+  --primary: #b39cff;
+  --primary-deep: #8b74f1;
+  --green: #66bca1;
+  --red: #db8080;
+  --shadow-outer: 9px 9px 18px rgba(120, 104, 183, 0.12);
+  --shadow-inner-top: inset 4px 4px 8px rgba(255, 255, 255, 0.85);
+  --shadow-inner-bottom: inset -4px -4px 8px rgba(70, 59, 104, 0.08);
+}
+
+body[data-font='poppins'] {
+  font-family: 'Poppins', 'Segoe UI', sans-serif;
+}
+
+body[data-font='serif'] {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+body[data-density='compact'] {
+  --radius-xl: 22px;
+  --radius-lg: 20px;
+  --radius-md: 16px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -87,6 +161,11 @@ img {
   display: none !important;
 }
 
+.settings-block,
+.theme-option,
+.settings-row,
+.toggle-row,
+.profile-panel,
 .auth-card,
 .sidebar,
 .user-pill,
@@ -101,6 +180,89 @@ img {
   border-radius: var(--radius-lg);
   background: var(--panel);
   box-shadow: var(--shadow-outer), var(--shadow-inner-top), var(--shadow-inner-bottom);
+}
+
+.settings-block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.settings-section-title {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary-deep);
+  font-weight: 800;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.3);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.theme-option.selected {
+  outline: 2px solid rgba(240, 107, 82, 0.38);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.2));
+}
+
+.theme-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: inset 2px 2px 6px rgba(255,255,255,0.7), inset -2px -2px 6px rgba(0,0,0,0.08);
+}
+
+.theme-swatch.sunset { background: linear-gradient(135deg, #ffd5c8, #ff9a7a); }
+.theme-swatch.midnight { background: linear-gradient(135deg, #2f3b5b, #6f90ff); }
+.theme-swatch.mint { background: linear-gradient(135deg, #d9fbe6, #6ad9aa); }
+.theme-swatch.lilac { background: linear-gradient(135deg, #e6dfff, #bfabff); }
+
+.settings-row,
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.settings-row label,
+.toggle-row span {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.settings-row select {
+  min-width: 150px;
+  border: 1px solid rgba(87, 82, 94, 0.1);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 10px 12px;
+  border-radius: 14px;
+  color: var(--ink);
+}
+
+.toggle-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
 }
 
 .btn-primary,

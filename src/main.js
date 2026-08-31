@@ -416,6 +416,7 @@ function renderSettingsContent(type) {
 
       savePreferences(nextPrefs);
       applyAppearanceSettings();
+      closeProfilePanel();
       flash('Appearance updated', 'success');
     });
 
@@ -459,6 +460,7 @@ function renderSettingsContent(type) {
     };
 
     savePreferences(nextPrefs);
+    closeProfilePanel();
     flash('Notification preferences saved', 'success');
   });
 
